@@ -37,10 +37,14 @@ export function buildCharacter(d) {
     add(torso, new THREE.SphereGeometry(0.035, 6, 6), MAT(c), (i - 1.5) * 0.13 * b + (k % 2) * 0.05, 0.15 + k * 0.17, -0.27 * b); } });
   if (d.jacket) add(torso, new THREE.CylinderGeometry(0.33 * b, 0.29 * b, 0.74, 16, 1, true), MAT(d.jacket, { side: THREE.DoubleSide, roughness: 0.35 }), 0, 0.38, 0);
   if (d.overshirt) add(torso, new THREE.CylinderGeometry(0.32 * b, 0.28 * b, 0.74, 16, 1, true), MAT(d.overshirt, { side: THREE.DoubleSide }), 0, 0.38, 0);
+  if (d.vest) add(torso, new THREE.CylinderGeometry(0.325 * b, 0.285 * b, 0.6, 16, 1, true), MAT(d.vest, { side: THREE.DoubleSide }), 0, 0.33, 0);
+  if (d.coat) add(torso, new THREE.CylinderGeometry(0.335 * b, 0.45 * b, 1.15, 18, 1, true), MAT(d.coat, { side: THREE.DoubleSide }), 0, 0.12, 0); // long open coat (lab coat)
+  if (extras.includes('tie')) add(torso, new THREE.BoxGeometry(0.07, 0.4, 0.03), MAT(d.tie || 0xaa2222), 0, 0.5, 0.3 * b);
+  if (extras.includes('pin')) add(torso, new THREE.SphereGeometry(0.03, 8, 8), MAT(0xd4af37, { metalness: 0.9 }), 0.14 * b, 0.62, 0.3 * b);
 
   // arms (pivot at shoulder)
   const arms = [];
-  const sleeveCol = d.jacket || d.overshirt || d.top;
+  const sleeveCol = d.coat || d.jacket || d.overshirt || d.top;
   for (const x of [-1, 1]) {
     const arm = new THREE.Group(); arm.position.set(x * 0.36 * b, 0.7, 0); torso.add(arm);
     const upper = sleeves === 'none' ? skin : MAT(sleeveCol);
@@ -66,6 +70,14 @@ export function buildCharacter(d) {
     const n = add(head, new THREE.TorusGeometry(0.14, 0.01, 6, 24), MAT(extras.includes('choker') ? 0xdddddd : 0xd4af37, { metalness: 0.8 }), 0, -0.19, 0);
     n.rotation.x = Math.PI / 2;
   }
+  if (extras.includes('stethoscope')) {
+    const n = add(head, new THREE.TorusGeometry(0.17, 0.014, 6, 20), MAT(0x222222), 0, -0.3, 0.05); n.rotation.x = Math.PI / 2.4;
+    add(head, new THREE.CylinderGeometry(0.035, 0.035, 0.02, 12), MAT(0xbbbbbb, { metalness: 0.8 }), 0, -0.62, 0.3).rotation.x = Math.PI / 2;
+  }
+  if (extras.includes('bandana')) {
+    add(head, new THREE.CylinderGeometry(0.255, 0.255, 0.07, 20, 1, true), MAT(d.bandana || 0xb01818, { side: THREE.DoubleSide }), 0, 0.12, 0);
+    add(head, new THREE.BoxGeometry(0.1, 0.08, 0.05), MAT(d.bandana || 0xb01818), 0, 0.12, -0.27);
+  }
   if (extras.includes('glasses')) for (const x of [-0.09, 0.09]) add(head, new THREE.TorusGeometry(0.055, 0.008, 6, 16), MAT(0x111111), x, 0.03, 0.24);
   if (d.beard) add(head, new THREE.SphereGeometry(0.2, 16, 12, 0, 6.28, Math.PI * 0.5, Math.PI * 0.5), MAT(d.beard), 0, -0.04, 0.03).scale.set(0.95, 0.9, 0.95);
 
@@ -75,6 +87,8 @@ export function buildCharacter(d) {
   if (h.style === 'long') { cap(); add(head, new THREE.BoxGeometry(0.5, 0.7, 0.14), hm, 0, -0.3, -0.12); for (const x of [-1, 1]) add(head, new THREE.BoxGeometry(0.07, 0.65, 0.2), hm, x * 0.24, -0.28, 0); }
   if (h.style === 'short') cap(0.25);
   if (h.style === 'updo') { cap(); add(head, new THREE.SphereGeometry(0.14, 12, 12), hm, 0, 0.27, -0.08); }
+  if (h.style === 'bob') { cap(); add(head, new THREE.BoxGeometry(0.5, 0.3, 0.14), hm, 0, -0.1, -0.13); for (const x of [-1, 1]) add(head, new THREE.BoxGeometry(0.07, 0.3, 0.2), hm, x * 0.24, -0.08, 0); }
+  if (h.style === 'dreads') { cap(0.255); for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2; add(head, new THREE.CylinderGeometry(0.022, 0.016, 0.6, 6), hm, Math.sin(a) * 0.23, -0.25, Math.cos(a) * 0.21 - 0.03); } }
   if (h.style === 'locs') { cap(0.25); for (let i = 0; i < 14; i++) { const a = i / 14 * Math.PI * 2; add(head, new THREE.CylinderGeometry(0.018, 0.014, 0.3, 6), hm, Math.sin(a) * 0.22, -0.12, Math.cos(a) * 0.2 - 0.02); } }
 
   // hats
