@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=16';
-import { loadFaces, canDecrypt, normalize } from './faces.js?v=16';
-import { Fighter, MOVES } from './fighter.js?v=16';
-import { makeAI } from './ai.js?v=16';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=16';
-import { Net, Lobby, packInput, unpackInput } from './net.js?v=16';
-import { buildStage, MAPS } from './stage.js?v=16';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=19';
+import { loadFaces, canDecrypt, normalize } from './faces.js?v=19';
+import { Fighter, MOVES } from './fighter.js?v=19';
+import { makeAI } from './ai.js?v=19';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=19';
+import { Net, Lobby, packInput, unpackInput } from './net.js?v=19';
+import { buildStage, MAPS } from './stage.js?v=19';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -36,7 +36,9 @@ function frameCamera(cx, spread, k = 1, minHalf = 3.4) {
 cam.position.set(0, 1.5, 12);
 
 /* ---------- audio (tiny synth, no assets) ---------- */
-let actx; const sfx = (f, d = 0.08, type = 'square', v = 0.05) => {
+let actx, simMode = false; // simMode: balance testing (no sound, no rig prewarm)
+const sfx = (f, d = 0.08, type = 'square', v = 0.05) => {
+  if (simMode) return;
   try { actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.value = f;
     g.gain.value = v; g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + d);
@@ -196,7 +198,7 @@ const BOUNDS = 5.2, game = { bounds: BOUNDS };
 const coarse = matchMedia('(pointer:coarse)').matches;
 setupTouch();
 
-function clearFighters() { clearHelpers(); fighters.forEach((f) => { scene.remove(f.rig.root); if (f.helperRig) scene.remove(f.helperRig.root); }); fighters = []; projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = []; }
+function clearFighters() { cutT = 0; cut = null; show('cut', false); clearHelpers(); fighters.forEach((f) => { scene.remove(f.rig.root); if (f.helperRig) scene.remove(f.helperRig.root); }); fighters = []; projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = []; }
 
 function startMatch() {
   show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters(); rngSeed = 0x9e3779b9; if (mode !== 'online') stage.setMap(resolveMap());
@@ -240,14 +242,14 @@ let rngSeed = 0x9e3779b9;
 game.rand = () => { rngSeed = (rngSeed + 0x6D2B79F5) | 0; let t = Math.imul(rngSeed ^ (rngSeed >>> 15), 1 | rngSeed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32: same sequence on both machines
 let helpers = [];
 function makeHelperInput(h, owner) {
-  const seq = [['lp'], ['lp'], ['hp'], ['lk'], ['hk'], ['d', 'lk'], ['lp'], ['hp'], ['d', 'hp']];
-  let i = 0, cool = 15, hold = 0, press = null;
+  const seq = [['lp'], ['lk'], ['lp'], ['lp'], ['lk']]; // light moves only: she nudges and distracts, she does not set up big combos
+  let i = 0, cool = 30, hold = 0, press = null;
   return () => {
     const o = EMPTY(), opp = fighters[1 - owner.side], dx = Math.abs(opp.x - h.x), fwd = h.face > 0 ? 'r' : 'l';
     if (hold > 0) { hold--; if (press) for (const k of press) o[k] = 1; return o; }
     if (cool > 0) cool--;
     if (dx > 1.45) { o[fwd] = 1; if (dx > 3) o.run = 1; if (dx > 3.4 && cool === 0 && h.fbCooldown === 0) { press = ['sp']; hold = 2; cool = 40; } }
-    else if (cool === 0) { press = seq[i++ % seq.length]; hold = 2; cool = 12 + (press.length > 1 ? 14 : 8); }
+    else if (cool === 0) { press = seq[i++ % seq.length]; hold = 2; cool = 34 + (press.length > 1 ? 16 : 6); /* slow cadence: she is a helper, not a second fighter */ }
     return o;
   };
 }
@@ -258,6 +260,7 @@ function ghostify(rig) {
 function removeHelper(h) { stage.spark(h.f.x, 1, 14, 0x9ad8ff, 0.9); if (h.owner.helperRig === h.f.rig) h.f.rig.root.position.set(100, 0, 0); else scene.remove(h.f.rig.root); }
 // Build and compile summon rigs before the fight so nothing heavy happens mid-match (a rig build was a visible hitch). They wait off-screen.
 function prewarmHelpers() {
+  if (simMode) return;
   fighters.forEach((f) => {
     const cfg = f.def.ultimate?.summon, def = cfg && defs.find((d) => d.id === cfg.id); if (!def) return;
     const rig = makeRig(def); ghostify(rig); rig.root.position.set(100, 0, 0); scene.add(rig.root); f.helperRig = rig;
@@ -277,7 +280,7 @@ function trySummon(f) { // returns the helper's label if she showed up
   helpers = helpers.filter((h) => { if (h.owner === f) { removeHelper(h); return false; } return true; });
   let rig = f.helperRig; if (!rig) { rig = makeRig(def); ghostify(rig); scene.add(rig.root); }
   const hf = new Fighter(def, rig, f.side, null);
-  hf.getInput = makeHelperInput(hf, f); hf.power = cfg.power ?? 0.7; hf.inv = 999999; hf.x = f.x - f.face * 0.9; hf.face = f.face;
+  hf.getInput = makeHelperInput(hf, f); hf.helper = true; hf.power = cfg.power ?? 0.7; hf.inv = 999999; hf.x = f.x - f.face * 0.9; hf.face = f.face;
   const label = cfg.label || def.name; helpers.push({ f: hf, owner: f, life: Math.round((cfg.seconds ?? 10) * 60), label });
   stage.spark(hf.x, 1, 24, 0x9ad8ff, 1.2);
   return label.toUpperCase();
@@ -295,11 +298,38 @@ game.spawnProjectile = (f, kind = 'fb') => {
   if (!ult) f.fbCooldown = 50;
   sfx(ult ? 150 : 300, ult ? 0.5 : 0.2, 'sawtooth', ult ? 0.12 : 0.05);
 };
-game.onUlt = (f) => { // mostly cosmetic; the optional summon is part of the sim (seeded RNG)
-  const summoned = trySummon(f);
-  ultT = 70; banner((f.def.ultimate?.name || 'ULTIMATE').toUpperCase() + '!', summoned ? summoned + ' SHOWS UP TO HELP!' : ''); stage.shake += 0.7; sfx(80, 0.6, 'sawtooth', 0.12);
-  const el = $('flash'); el.style.transition = 'none'; el.style.opacity = 0.85; requestAnimationFrame(() => { el.style.transition = 'opacity .7s'; el.style.opacity = 0; });
-};
+/* ---- Ultimate cutscene: a 5 s freeze with a close-up camera and a themed overlay per character.
+   The freeze is part of the sim (both players freeze together online); the visuals are cosmetic. Offline you can tap to skip. ---- */
+const CUT_TICKS = 300; let cutT = 0, cut = null;
+function startCutscene(f, summoned) {
+  const u = f.def.ultimate || {}, cs = u.cutscene || {}, color = cs.color || u.color || '#ffd02a';
+  cut = { f, sparkColor: parseInt(String(color).replace('#', ''), 16) || 0xffffff, after: { title: (u.name || 'ULTIMATE').toUpperCase() + '!', sub: summoned ? summoned + ' SHOWS UP TO HELP!' : '' } };
+  cutT = CUT_TICKS;
+  if (simMode) return;
+  const lines = [...(cs.lines || [(u.name || 'ULTIMATE').toUpperCase()])]; if (summoned) lines.push('+ ' + summoned + ' JOINS THE FIGHT!');
+  const per = 4.6 / lines.length, c = $('cut'), glyphs = [...(cs.glyphs || '★')];
+  c.style.setProperty('--c', color); c.dataset.theme = cs.theme || 'plain';
+  let fx = '';
+  for (let i = 0; i < 22; i++) fx += `<span class="p ${cs.motion || 'rise'}" style="left:${Math.round(Math.random() * 96)}%;font-size:${30 + Math.round(Math.random() * 44)}px;animation-delay:${(Math.random() * 3).toFixed(2)}s;animation-duration:${(2 + Math.random() * 2).toFixed(2)}s">${glyphs[i % glyphs.length]}</span>`;
+  c.innerHTML = `<div class="dim"></div><div class="rays"></div><div class="strobe"></div><div class="candle"></div><svg class="ecg" viewBox="0 0 400 60" preserveAspectRatio="none"><path d="M0 30 H110 l8 -26 l12 52 l10 -26 H230 l8 -26 l12 52 l10 -26 H400"/></svg><div class="fx">${fx}</div><div class="cb top"></div><div class="cb bot"></div><div class="who">${f.def.name.toUpperCase()}</div><div class="utitle">${u.name || 'ULTIMATE'}</div>`
+    + lines.map((l, i) => `<div class="cl${summoned && i === lines.length - 1 ? ' sum' : ''}" style="animation-delay:${(0.5 + i * per).toFixed(2)}s;animation-duration:${per.toFixed(2)}s">${l}</div>`).join('')
+    + `<div class="skip">${mode === 'online' ? '' : 'tap to skip'}</div>`;
+  show('cut'); stage.shake += 0.5; sfx(70, 0.9, 'sawtooth', 0.14);
+  const el = $('flash'); el.style.transition = 'none'; el.style.opacity = 0.9; requestAnimationFrame(() => { el.style.transition = 'opacity .8s'; el.style.opacity = 0; });
+}
+function endCutscene() {
+  show('cut', false); if (!cut) return;
+  ultT = 70; banner(cut.after.title, cut.after.sub); sfx(120, 0.4, 'square', 0.1); stage.shake += 0.6; cut = null;
+}
+function cutCamera(dt) { // slow push-in on the caster's upper body
+  const c = cut.f, p = 1 - cutT / CUT_TICKS, s = 1 - Math.pow(0.88, dt * 60);
+  const tx = c.x + c.face * 0.3, ty = 1.5 + Math.sin(p * 6) * 0.05, tz = 7.2 - 2.0 * p;
+  cam.position.x += (tx - cam.position.x) * s; cam.position.y += (ty - cam.position.y) * s; cam.position.z += (tz - cam.position.z) * s;
+  cam.lookAt(c.x + c.face * 0.2, 1.4, 0);
+  if (Math.random() < 0.35) stage.spark(c.x + (Math.random() - 0.5) * 1.6, 0.6 + Math.random() * 1.6, 2, cut.sparkColor, 0.8); // cosmetic
+}
+$('cut').onclick = () => { if (mode !== 'online' && cutT > 0 && CUT_TICKS - cutT > 60) cutT = 1; };
+game.onUlt = (f) => startCutscene(f, trySummon(f)); // the summon roll is part of the sim (seeded RNG)
 game.tryHit = (att, def, m) => {
   if (def.inv > 0 || phase !== 'fight') return false;
   if (def.state === 'down' || def.state === 'getup') return false;
@@ -308,7 +338,7 @@ game.tryHit = (att, def, m) => {
   const a = att.x, b = att.x + att.face * m.reach;
   if (Math.min(a, b) - 0.3 > def.x || Math.max(a, b) + 0.3 < def.x) return false;
   const r = def.receive(att, m, game);
-  hitstop = Math.max(hitstop, r === 'block' ? 2 : Math.min(7, 2 + Math.round(m.dmg / 3)));
+  if (!att.helper) hitstop = Math.max(hitstop, r === 'block' ? 2 : Math.min(7, 2 + Math.round(m.dmg / 3)));
   if (Math.abs(def.x) >= game.bounds - 0.05) att.vx = -att.face * ((m.kb || 0.05) + 0.04); // cornered: attacker gets pushed back instead
   sfx(r === 'block' ? 120 : 200, 0.09, r === 'block' ? 'triangle' : 'square', r === 'block' ? 0.05 : 0.09);
   const hx = def.x - att.face * 0.25, hy = Math.max(0.4, def.y + (m.y[0] + m.y[1]) / 2 - att.y);
@@ -325,6 +355,7 @@ function step60() {
   }
   const none = EMPTY();
   const [a, b] = fighters;
+  if (cutT > 0) { a.poll(); b.poll(); if (--cutT === 0) endCutscene(); return; } // Ultimate cutscene: everything is frozen
   if (ultT > 0 && --ultT === 0 && phase === 'fight') banner('');
   if (phase === 'fight') { if (hitstop > 0) { hitstop--; a.poll(); b.poll(); } else { timer--; a.update(b, game); b.update(a, game); updateHelpers(); } }
   else { a.update(b, game, none); b.update(a, game, none); }
@@ -413,16 +444,16 @@ function loop(now) {
     }
     if (fighters.length) {
       const [a, b] = fighters;
-      const alpha = paused || hitstop > 0 ? 1 : Math.min(1, acc * 60);
+      const alpha = paused || hitstop > 0 || cutT > 0 ? 1 : Math.min(1, acc * 60);
       fighters.forEach((f) => poseUpdate(f, alpha, dt)); helpers.forEach((h) => poseUpdate(h.f, alpha, dt));
-      frameCamera((a.x + b.x) / 2, Math.abs(a.x - b.x), dt * 60);
+      if (cutT > 0 && cut) cutCamera(dt); else frameCamera((a.x + b.x) / 2, Math.abs(a.x - b.x), dt * 60);
       setW('hp0', Math.max(0, (a.hp / a.maxHp) * 100)); setW('hp1', Math.max(0, (b.hp / b.maxHp) * 100));
       [a, b].forEach((f, i) => { setW('m' + i, Math.min(100, f.meter)); const full = f.meter >= 100; if (cache['full' + i] !== full) { cache['full' + i] = full; $('m' + i).parentElement.classList.toggle('full', full); } });
       const bk = helpers.map((h) => `${h.label} · ${Math.ceil(h.life / 60)}s`).join('   '); setT('backup', bk); if (cache.bkv !== !!bk) { cache.bkv = !!bk; $('backup').classList.toggle('hidden', !bk); }
       setT('timer', String(Math.max(0, Math.ceil(timer / 60))));
     }
   }
-  if (phase === 'fight' && !paused && !adOpen() && now > nextAdAt) showAd();
+  if (phase === 'fight' && !paused && cutT === 0 && !adOpen() && now > nextAdAt) showAd();
   if (phase !== 'fight' && phase !== 'intro' && phase !== 'end' && adOpen()) show('ad', false);
   stage.update(now, dt);
   const sh = stage.shake * 0.14, ox = (Math.random() - 0.5) * sh, oy = (Math.random() - 0.5) * sh;
@@ -442,7 +473,7 @@ addEventListener('keydown', (e) => {
 $('resume').onclick = closePause;
 $('pauseBtn').onclick = openPause;
 
-const V = 16;
+const V = 19;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [
@@ -502,4 +533,18 @@ async function boot() {
   openGate();
 }
 boot().catch((e) => { $('loading').classList.remove('hidden'); $('loading').textContent = 'Failed to load. Run the game through a web server (see README). ' + e; });
-window.__game = { get fighters() { return fighters; }, get phase() { return phase; }, get tick() { return simTick; } };
+window.__game = { get defs() { return defs; }, get fighters() { return fighters; }, get phase() { return phase; }, get tick() { return simTick; } };
+
+// Balance testing hook: plays CPU-vs-CPU matches synchronously and returns win counts. Usage (browser console): __sim('auburn','bruiser',10,1)
+window.__sim = (idA, idB, n = 1, level = 1) => {
+  simMode = true; const out = { a: 0, b: 0, ticks: 0 };
+  try {
+    for (let i = 0; i < n; i++) {
+      picks = [defs.find((d) => d.id === idA), defs.find((d) => d.id === idB)]; mode = 'ai'; diff = level; startMatch();
+      fighters[0].getInput = makeAI(fighters[0], fighters[1], level);
+      let guard = 0; while (phase !== 'over' && guard++ < 400000) { step60(); out.ticks++; }
+      if (matchWinner === 0) out.a++; else if (matchWinner === 1) out.b++;
+    }
+  } finally { simMode = false; goMenu(); }
+  return out;
+};

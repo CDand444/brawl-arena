@@ -15,9 +15,9 @@
  "build": 1.05,
  "sleeves": "long",
  "stats": {
-  "speed": 1,
-  "power": 1,
-  "health": 1
+  "speed": 1.0,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Meet the Parents",
@@ -40,8 +40,19 @@
    "id": "crimson",
    "chance": 0.5,
    "seconds": 10,
-   "power": 0.7,
+   "power": 0.12,
    "label": "The Politician"
+  },
+  "cutscene": {
+   "theme": "dinner",
+   "color": "#ffd02a",
+   "glyphs": "🍗🕯️🥔",
+   "motion": "rise",
+   "lines": [
+    "YES SIR. NO SIR.",
+    "THANK YOU FOR HAVING ME.",
+    "NOW… PASS THE POTATOES."
+   ]
   }
  }
 }

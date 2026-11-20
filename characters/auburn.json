@@ -18,9 +18,9 @@
   "necklace"
  ],
  "stats": {
-  "speed": 1.05,
-  "power": 1,
-  "health": 1
+  "speed": 1.03,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Ember",
@@ -38,6 +38,16 @@
  },
  "ultimate": {
   "name": "Sweet Revenge",
-  "color": "#ff6aa0"
+  "color": "#ff6aa0",
+  "cutscene": {
+   "theme": "sweet",
+   "color": "#ff6aa0",
+   "glyphs": "♥🍫💋",
+   "motion": "rise",
+   "lines": [
+    "SWEET…",
+    "…BUT SHE BITES."
+   ]
+  }
  }
 }

@@ -180,6 +180,7 @@ export class Fighter {
     if (this.state === 'attack' && this.move.projectile === 'ult' && this.t <= this.move.s && this.hp - dmg * 0.5 > 0) { // super armor while charging an Ultimate
       this.hp -= dmg * 0.5; this.comboHits++; return 'hit';
     }
+    if (att.helper) { this.hp = Math.max(1, this.hp - dmg); return 'hit'; } // summoned backup: chip damage only. No stun, no knockdown, and she can't land the KO
     this.hp = Math.max(0, this.hp - dmg); this.comboHits++; att.comboDmg = (att.comboHits = this.comboHits, dmg);
     this.t = 0; this.wv = 0; this.buf = null; this.bufT = 0;
     if (m.launch || m.knock || this.hp <= 0 || !this.grounded) {

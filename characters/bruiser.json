@@ -21,9 +21,9 @@
   "watch"
  ],
  "stats": {
-  "speed": 0.9,
-  "power": 1.2,
-  "health": 1.15
+  "speed": 1.0,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Hype Wave",
@@ -47,8 +47,19 @@
    "id": "auburn",
    "chance": 0.5,
    "seconds": 10,
-   "power": 0.7,
+   "power": 0.12,
    "label": "White Chocolate"
+  },
+  "cutscene": {
+   "theme": "sunrise",
+   "color": "#ffb02a",
+   "glyphs": "☀🔥💪",
+   "motion": "rise",
+   "lines": [
+    "WAKE UP.",
+    "GRIND.",
+    "BELIEVE IT. THEN HIT IT."
+   ]
   }
  }
 }

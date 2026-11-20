@@ -14,9 +14,9 @@
  "sleeves": "none",
  "gown": true,
  "stats": {
-  "speed": 0.95,
-  "power": 1.05,
-  "health": 1.05
+  "speed": 0.98,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Code Blue",
@@ -38,6 +38,17 @@
  ],
  "ultimate": {
   "name": "Bedside Manner",
-  "color": "#4ac8ff"
+  "color": "#4ac8ff",
+  "cutscene": {
+   "theme": "ecg",
+   "color": "#4ac8ff",
+   "glyphs": "💍🩺💉",
+   "motion": "rise",
+   "lines": [
+    "CODE BLUE!",
+    "I’M A DOCTOR AND A WIFE.",
+    "STAT!"
+   ]
+  }
  }
 }

@@ -13,9 +13,9 @@
  "build": 1.05,
  "sleeves": "short",
  "stats": {
-  "speed": 1,
-  "power": 1,
-  "health": 1
+  "speed": 1.0,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Tidal",
@@ -33,6 +33,17 @@
  },
  "ultimate": {
   "name": "Because I Said So",
-  "color": "#2affd8"
+  "color": "#2affd8",
+  "cutscene": {
+   "theme": "dad",
+   "color": "#2affd8",
+   "glyphs": "🚗💤🧢",
+   "motion": "fall",
+   "lines": [
+    "*SIGH*",
+    "DON’T MAKE ME TURN THIS CAR AROUND.",
+    "BECAUSE I SAID SO."
+   ]
+  }
  }
 }

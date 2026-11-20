@@ -23,9 +23,9 @@
   "choker"
  ],
  "stats": {
-  "speed": 1.15,
-  "power": 0.95,
-  "health": 0.95
+  "speed": 1.08,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Filibuster",
@@ -44,6 +44,16 @@
  },
  "ultimate": {
   "name": "Executive Order",
-  "color": "#ff2a2a"
+  "color": "#ff2a2a",
+  "cutscene": {
+   "theme": "politics",
+   "color": "#ff2a2a",
+   "glyphs": "★🎙️🗳️",
+   "motion": "fall",
+   "lines": [
+    "I APPROVE THIS MESSAGE.",
+    "EXECUTIVE ORDER: PAIN."
+   ]
+  }
  }
 }

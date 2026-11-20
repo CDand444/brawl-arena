@@ -45,6 +45,10 @@ smooth walk acceleration, air steering + fast-fall (hold down), impact freeze-fr
   with armor while charging. Name/color from `ultimate` in JSON. On touch screens: SPECIAL and ULT buttons.
 - Controls live in the pause menu (Esc or the pause button). Online it overlays the running match.
 
+### Ultimate cutscene
+Every Ultimate plays a 5 s cutscene (sim freeze + close-up camera + themed overlay). Per character in JSON: `ultimate.cutscene = {theme, color, glyphs, motion, lines[]}`
+themes: sweet, politics, sunrise, hat, street, ecg, dad, dinner (or `plain`); `motion` = rise | fall | spin for the floating glyphs. Offline you can tap to skip after 1 s; online it is unskippable so both players stay in sync.
+
 ### Summons
 An `ultimate` can carry `"summon": {"id":"<character id>","chance":0.5,"seconds":10,"power":0.7,"label":"..."}`: when the Ultimate is cast there is that chance a scripted, untouchable
 ghost ally (the other character) fights alongside for that long. Tha Motivator summons White Chocolate; Black Son In Law summons The Politician. Rolls use the shared seeded RNG (`game.rand`) so online matches stay in sync.
@@ -86,3 +90,7 @@ Rollback netcode (smoother at high ping), real animation/rigged models, throws, 
 ## Performance notes
 Rendering is decoupled from the 60 Hz sim (interpolated, time-based smoothing); sparks are pooled; no lights are added/removed at runtime (that recompiles shaders);
 quality drops automatically on sustained low fps (phones start lower). Press F3 for an fps/quality readout.
+
+## Balance testing
+`__sim(idA, idB, n, level)` in the browser console plays CPU-vs-CPU matches at full speed and returns win counts (level 0-2). Last round-robin (30 matches per pairing): all 8 fighters between 43% and 57% at Normal and 46% to 56% at Hard.
+Tuning notes: stats kept within about +/-8% (speed/power/health multiply, so small differences matter); a summoned backup is chip-damage only (no stun, cannot KO) at 12% power, because even weak helpers swung win rates by ~17 points.

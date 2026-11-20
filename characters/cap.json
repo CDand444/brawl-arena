@@ -21,9 +21,9 @@
   "glasses"
  ],
  "stats": {
-  "speed": 1.2,
-  "power": 0.85,
-  "health": 0.95
+  "speed": 1.08,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Drive-By",
@@ -41,6 +41,16 @@
  },
  "ultimate": {
   "name": "Big Homie Energy",
-  "color": "#ffd02a"
+  "color": "#ffd02a",
+  "cutscene": {
+   "theme": "street",
+   "color": "#ffd02a",
+   "glyphs": "📸🔊😎",
+   "motion": "fall",
+   "lines": [
+    "PULL UP.",
+    "BIG HOMIE ENERGY."
+   ]
+  }
  }
 }

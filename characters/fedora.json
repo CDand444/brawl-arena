@@ -24,9 +24,9 @@
   "color": "#e6b8b0"
  },
  "stats": {
-  "speed": 1,
-  "power": 1,
-  "health": 1
+  "speed": 1.0,
+  "power": 1.0,
+  "health": 1.0
  },
  "special": {
   "name": "Hat Trick",
@@ -50,6 +50,17 @@
  "tie": "#c9a227",
  "ultimate": {
   "name": "Thing One and Thing Two",
-  "color": "#ff4a4a"
+  "color": "#ff4a4a",
+  "cutscene": {
+   "theme": "hat",
+   "color": "#ff4a4a",
+   "glyphs": "🎩🎩🎩",
+   "motion": "spin",
+   "lines": [
+    "THING ONE.",
+    "THING TWO.",
+    "TROUBLE IS GONNA HAPPEN."
+   ]
+  }
  }
 }
