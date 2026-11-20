@@ -17,6 +17,8 @@ export const MOVES = {
 };
 
 export const SPECIAL_COST = 25; // a ranged special spends a quarter of the SUPER bar; an Ultimate spends all of it
+// Smash launch directions as [cos, sin] constants (no runtime trig: Math.sin/cos can differ between browsers, which would break online sync)
+const ANG = { mid: [0.73, 0.68], up: [0.22, 0.97], low: [0.9, 0.43] };
 const BUFFER = 7;        // ticks a button press is remembered, so near-simultaneous inputs still register
 const MAX_CHAIN = 3;     // cancels allowed per string
 const PRESS = ['lp', 'hp', 'lk', 'hk', 'sp'];
@@ -28,17 +30,18 @@ export class Fighter {
     this.def = def; this.rig = rig; this.side = side; this.getInput = getInput;
     const st = def.stats || {};
     this.speed = st.speed ?? 1; this.power = st.power ?? 1; this.maxHp = 200 * (st.health ?? 1); // doubled
+    this.weight = Math.max(0.85, st.health ?? 1); // Smash mode: heavier fighters fly less far
     this.reset(side === 0 ? -2 : 2);
   }
 
   reset(x) {
     Object.assign(this, { x, px: x, py: 0, y: 0, vy: 0, vx: 0, wv: 0, face: this.side === 0 ? 1 : -1, hp: this.maxHp, state: 'idle', t: 0, move: null, airMove: null,
       hitDone: false, comboHits: 0, comboDmg: 0, inv: 0, stun: 0, crouchBlock: false, prev: EMPTY(), hist: [], held: null, propDone: false, fbCooldown: 0, u: 0, meter: 0,
-      buf: null, bufT: 0, chain: 0, djUsed: false, dj0: 0 });
+      buf: null, bufT: 0, chain: 0, djUsed: false, dj0: 0, onGround: true, pct: 0, dropT: 0, recUsed: false });
   }
 
   get crouching() { return this.state === 'crouch' || (this.state === 'block' && this.crouchBlock) || (this.state === 'attack' && this.move.crouching); }
-  get grounded() { return this.y <= 0.001 && this.vy <= 0; }
+  get grounded() { return this.onGround && this.vy <= 0; }
 
   startAttack(name, chained = false) {
     this.state = 'attack'; this.move = MOVES[name]; this.moveName = name; this.t = 0; this.hitDone = false; this.propDone = false; this.vx = 0; this.wv = 0;
@@ -93,9 +96,18 @@ export class Fighter {
     const dirIn = inp.r - inp.l;
 
     // vertical physics
-    if (this.y > 0 || this.vy > 0) { this.y += this.vy; this.vy -= 0.013; if (this.y <= 0) { this.y = 0; this.vy = 0; this.onLand(); } }
+    if (this.dropT > 0) this.dropT--;
+    if (!this.onGround || this.vy > 0) {
+      const prevY = this.y; this.y += this.vy; this.vy -= 0.013;
+      if (game.smash && this.vy < -0.34) this.vy = -0.34; // terminal fall speed
+      const fl = game.floorBelow ? game.floorBelow(this, prevY) : (this.y <= 0 ? 0 : null);
+      if (fl !== null && this.vy <= 0) { this.y = fl; this.vy = 0; this.onGround = true; this.onLand(); } else this.onGround = false;
+    } else if (game.supportAt && !game.supportAt(this)) { // walked off a ledge
+      this.onGround = false;
+      if (['idle', 'walk', 'run', 'crouch', 'block'].includes(this.state)) { this.state = 'air'; this.airMove = null; this.hitDone = false; this.propDone = false; }
+    }
     // horizontal
-    this.x += this.vx; if (this.state !== 'air' && this.state !== 'down') this.vx *= 0.8;
+    this.x += this.vx; if (this.state !== 'air' && this.state !== 'down') this.vx *= 0.8; else if (game.smash) this.vx *= 0.985; // air drag on launches
     this.x = Math.max(-game.bounds, Math.min(game.bounds, this.x));
 
     const free = ['idle', 'walk', 'run', 'crouch', 'block'].includes(this.state);
@@ -104,6 +116,9 @@ export class Fighter {
     switch (this.state) {
       case 'idle': case 'walk': case 'run': case 'crouch': case 'block': {
         this.crouchBlock = false;
+        if (pr.d && game.onSoft && game.onSoft(this)) { // tap down on a floating platform: drop through it
+          this.dropT = 14; this.onGround = false; this.y -= 0.02; this.state = 'air'; this.airMove = null; this.hitDone = false; this.propDone = false; break;
+        }
         if (pr.th) { // pick up a nearby item, or throw the one you're holding
           if (this.held) { this.startAttack('throw'); break; }
           if (game.grab && game.grab(this)) break;
@@ -147,6 +162,10 @@ export class Fighter {
         break;
       }
       case 'air': {
+        if (game.smash && pr.sp && inp.u && !this.recUsed) { // recovery: up + SPECIAL in the air, once per airtime
+          this.recUsed = true; this.djUsed = true; this.vy = 0.31; this.vx = dirIn * 0.06 * this.speed; this.airMove = null; this.hitDone = false;
+          if (game.onRecover) game.onRecover(this);
+        }
         // double jump: tap jump again in the air (once per jump)
         if (pr.u && !this.djUsed) {
           this.djUsed = true; this.dj0 = this.u; this.vy = 0.18; this.vx = dirIn * 0.05 * this.speed; this.airMove = null; this.hitDone = false; this.propDone = false;
@@ -160,7 +179,8 @@ export class Fighter {
         break;
       }
       case 'blockstun': case 'hit': if (this.t >= this.stun) this.state = this.state === 'hit' ? 'idle' : (inp.bl ? 'block' : 'idle'); break;
-      case 'down': if (this.grounded && this.t > this.lieT && this.hp > 0) { this.state = 'getup'; this.t = 0; this.inv = 24; } break;
+      case 'down': if (game.smash && !this.grounded && this.t >= this.stun) { this.state = 'air'; this.airMove = null; break; }
+        if (this.grounded && this.t > this.lieT && this.hp > 0) { this.state = 'getup'; this.t = 0; this.inv = 24; } break;
       case 'getup': if (this.t >= 20) this.state = 'idle'; break;
       default: break;
     }
@@ -168,7 +188,7 @@ export class Fighter {
   }
 
   onLand() {
-    this.djUsed = false;
+    this.djUsed = false; this.recUsed = false;
     if (this.state === 'air') { this.state = 'idle'; this.airMove = null; this.vx = 0; this.wv = 0; }
     else if (this.state === 'down') { this.vx = 0; this.lieT = this.t + 34; }
   }
@@ -187,10 +207,11 @@ export class Fighter {
     const dmg = m.dmg * att.power * scale;
     this.meter = Math.min(100, this.meter + dmg * 1.2); if (!m.noMeter) att.meter = Math.min(100, att.meter + dmg * 1.8); // specials/Ultimates never refill the attacker's bar // x1.5 because health is doubled: Ultimates stay as frequent as before
     if (this.state === 'attack' && this.move.projectile === 'ult' && this.t <= this.move.s && this.hp - dmg * 0.5 > 0) { // super armor while charging an Ultimate
-      this.hp -= dmg * 0.5; this.comboHits++; return 'hit';
+      if (game.smash) this.pct += dmg * 0.5; else this.hp -= dmg * 0.5; this.comboHits++; return 'hit';
     }
-    if (att.helper) { this.hp = Math.max(1, this.hp - dmg); return 'hit'; } // summoned backup: chip damage only. No stun, no knockdown, and she can't land the KO
+    if (att.helper) { if (game.smash) this.pct += dmg; else this.hp = Math.max(1, this.hp - dmg); return 'hit'; } // summoned backup: chip damage only. No stun, no knockdown, and she can't land the KO
     if (this.held && game.dropHeld) game.dropHeld(this);
+    if (game.smash) return this.launch(att, m, dmg);
     this.hp = Math.max(0, this.hp - dmg); this.comboHits++; att.comboDmg = (att.comboHits = this.comboHits, dmg);
     this.t = 0; this.wv = 0; this.buf = null; this.bufT = 0;
     if (m.launch || m.knock || this.hp <= 0 || !this.grounded) {
@@ -200,12 +221,26 @@ export class Fighter {
     return 'hit';
   }
 
+  /** Smash mode: damage % rises, and the higher it is the farther every hit sends you. */
+  launch(att, m, dmg) {
+    this.pct += dmg; this.comboHits++; att.comboDmg = (att.comboHits = this.comboHits, dmg);
+    this.t = 0; this.wv = 0; this.buf = null; this.bufT = 0;
+    const dir = m.dir || (this.x === att.x ? att.face : this.x > att.x ? 1 : -1);
+    const K = (0.045 + m.dmg * 0.003 + this.pct * (m.dmg + 6) * 0.00011) / this.weight;
+    const a = m.launch ? ANG.up : m.low ? ANG.low : ANG.mid;
+    this.stun = Math.round(10 + K * 100);
+    if (K > 0.13 || !this.grounded) {
+      this.state = 'down'; this.vx = dir * K * a[0]; this.vy = K * a[1] * 1.5; this.onGround = false; this.lieT = 9999; this.djUsed = false; this.recUsed = false;
+    } else { this.state = 'hit'; this.vx = dir * K * 0.8; }
+    return 'hit';
+  }
+
   poseName() {
     switch (this.state) {
       case 'attack': return this.move.pose;
       case 'air': return this.airMove || (this.djUsed ? 'djump' : 'jump');
       case 'block': case 'blockstun': return this.crouchBlock ? 'crouchblock' : 'block';
-      case 'down': return this.grounded && this.y === 0 ? 'down' : 'fly';
+      case 'down': return this.grounded ? 'down' : 'fly';
       default: return this.state;
     }
   }

@@ -25,7 +25,7 @@ const glowSprite = (color, sx, sy, x, y, z) => {
 const sky = (G, stops) => { const m = new THREE.Mesh(new THREE.SphereGeometry(150, 24, 16), new THREE.MeshBasicMaterial({ map: gradTex(stops), side: THREE.BackSide, fog: false })); G.add(m); return m; };
 const floorPlane = (G, tex, rough = 0.6, metal = 0.1) => {
   const f = new THREE.Mesh(new THREE.PlaneGeometry(96, 20), new THREE.MeshStandardMaterial({ map: tex, roughness: rough, metalness: metal }));
-  f.rotation.x = -Math.PI / 2; f.receiveShadow = true; G.add(f); return f;
+  f.rotation.x = -Math.PI / 2; f.receiveShadow = true; f.userData.floor = true; G.add(f); return f;
 };
 let shadowSize = 2048; const shadowLights = [];
 const keyLight = (G, color, intensity, x, y, z) => {
@@ -164,7 +164,8 @@ export function buildStage(scene, renderer) {
   const rain = new THREE.Points(rg, new THREE.PointsMaterial({ color: 0x9ad8ff, size: 0.07, transparent: true, opacity: 0.55, depthWrite: false })); rain.visible = false; scene.add(rain);
   const env = { embers: (color, amount) => { embers.visible = amount > 0; embers.material.color.setHex(color); embers.material.opacity = amount; }, rain: (on) => { rain.visible = on; } };
 
-  let group = null, tick = null, current = null;
+  let group = null, tick = null, current = null, smashMode = false;
+  const applySmash = () => { if (!group) return; group.position.y = smashMode ? -9 : 0; group.traverse((o) => { if (o.userData.floor) o.visible = !smashMode; }); }; // Smash: the arena floats above the backdrop
   // spark pool: sprites and materials are created once and reused (creating/disposing per hit caused garbage-collection hitches)
   const POOL = 220, pool = [];
   for (let i = 0; i < POOL; i++) {
@@ -174,6 +175,7 @@ export function buildStage(scene, renderer) {
   const api = {
     shake: 0,
     get map() { return current; },
+    setSmash(on) { smashMode = on; applySmash(); },
     setShadows(n) {
       shadowSize = n;
       shadowLights.forEach((l) => { l.castShadow = n > 0; if (n > 0) { l.shadow.mapSize.set(n, n); if (l.shadow.map) { l.shadow.map.dispose(); l.shadow.map = null; } } });
@@ -181,7 +183,7 @@ export function buildStage(scene, renderer) {
     setMap(id) {
       if (!BUILDERS[id] || id === current) return;
       if (group) { scene.remove(group); group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map !== glowTex) { o.material.map?.dispose?.(); o.material.dispose?.(); } }); }
-      current = id; group = new THREE.Group(); scene.add(group); env.rain(false); shadowLights.length = 0; tick = BUILDERS[id](group, scene, env) || null;
+      current = id; group = new THREE.Group(); scene.add(group); env.rain(false); shadowLights.length = 0; tick = BUILDERS[id](group, scene, env) || null; applySmash();
     },
     spark(x, y, n = 8, color = 0xffd070, power = 1) {
       let made = 0;

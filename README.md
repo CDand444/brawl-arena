@@ -3,7 +3,7 @@
 Browser fighting game for a friend group, Mortal Kombat 3 style controls. 2.5D (3D bodies, real-photo 2D heads, side view). Desktop + phone + gamepad.
 Live: https://cdand444.github.io/brawl-arena/
 
-**Modes:** Arcade (fight all the other characters in a row, difficulty ramps), 1 Player vs CPU (3 difficulties), 2 Players on one keyboard (or two gamepads),
+**Modes:** **Smash** (up to 4, free-for-all, see below), Arcade (fight all the other characters in a row, difficulty ramps), 1 Player vs CPU (3 difficulties), 2 Players on one keyboard (or two gamepads),
 Online (live lobby list or 5-letter code). Best of 3 rounds, 120 s each.
 
 **Gamepad:** X/Y punches, A/B kicks, RB block, LT run, LB grab/throw, RT special, stick click ultimate, Start pause. Pad 1 = P1, pad 2 = P2.
@@ -43,6 +43,15 @@ extras[nosering|necklace|choker|glasses|watch], stats{speed,power,health ~0.85-1
 ## Fighting feel
 Double jump (tap jump again in the air), 7-tick input buffer, chain cancels (a connecting light attack can cancel into a different normal or special, max 3),
 smooth walk acceleration, air steering + fast-fall (hold down), impact freeze-frames (hitstop), and attacker pushback when the opponent is cornered.
+
+## Smash mode (up to 4 players)
+Free-for-all on a floating stage with 3 platforms (`src/smash.js`). No health bars: **damage %** climbs with each hit and the higher it is the farther you fly;
+get knocked past the edge of the screen (blast zone) and you lose a **life**. Last one with lives wins. Lives 1-9, stage picker.
+- Jump up through floating platforms, **tap down** to drop through. **Up + SPECIAL in the air** = one recovery boost per airtime (plus your double jump).
+- Slots: Keyboard 1 (WASD keys), Keyboard 2 (arrow keys), Gamepads 1-4, Touch, CPU (Easy/Normal/Hard) or Off. Each fighter gets a P1-P4 tag over their head.
+- **Online:** Online -> HOST SMASH ROOM. Friends tap it in the live list (or type the 6-letter code). Each player picks a fighter; the host fills empty slots with CPUs, picks lives and stage, and starts.
+  Star network through the host, deterministic lockstep for all 4 (CPU fighters use a seeded RNG so they act the same everywhere), 6-tick input delay.
+- Launch strength: `K = (0.045 + dmg*0.003 + pct*(dmg+6)*0.00011) / weight` (weight = health stat); angles are fixed constants (no runtime trig, for sync).
 
 ## Arena, props and health
 Arena is wide (bounds +/-9) with glowing edge posts; every fighter has double health (200 x the character's health stat); rounds last 120 s.

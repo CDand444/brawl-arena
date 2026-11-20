@@ -1,11 +1,12 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=25';
-import { loadFaces, canDecrypt, normalize } from './faces.js?v=25';
-import { Fighter, MOVES } from './fighter.js?v=25';
-import { makeAI } from './ai.js?v=25';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=25';
-import { Net, Lobby, packInput, unpackInput } from './net.js?v=25';
-import { buildStage, MAPS } from './stage.js?v=25';
+import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=27';
+import { loadFaces, canDecrypt, normalize } from './faces.js?v=27';
+import { Fighter, MOVES } from './fighter.js?v=27';
+import { makeAI } from './ai.js?v=27';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=27';
+import { Net, Lobby, Room, packInput, unpackInput } from './net.js?v=27';
+import { createSmash } from './smash.js?v=27';
+import { buildStage, MAPS } from './stage.js?v=27';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -114,12 +115,15 @@ function onMatchOver() { // label the end-of-match buttons
   else if (arcade.idx + 1 < n) b.textContent = `NEXT FIGHT (${arcade.idx + 2}/${n})`;
   else { banner('ARCADE CLEARED!', `${picks[0].name} beat everyone`); b.textContent = 'PLAY AGAIN'; }
 }
+$('btnSmash').onclick = () => { arcade = null; smash.openSetup(); };
 $('btnArcade').onclick = () => { mode = 'ai'; arcade = { order: [], idx: 0 }; openSelect(); };
 $('btn1p').onclick = () => { mode = 'ai'; arcade = null; diff = +$('diff').value; openSelect(); };
 $('btn2p').onclick = () => { mode = '2p'; arcade = null; openSelect(); };
 $('randBtn').onclick = () => choose(defs[(Math.random() * defs.length) | 0]);
 $('diff').onchange = (e) => (diff = +e.target.value);
 function goMenu() {
+  if (smash.active || smash.inRoom) smash.stop();
+  ['smashSetup', 'shud', 'sEnd'].forEach((i) => show(i, false));
   arcade = null; diff = +$('diff').value;
   stopLobby();
   if (mode === 'online') { net.close(); net = new Net(); }
@@ -138,8 +142,8 @@ function changeFighter() {
   openSelect();
 }
 $('changeBtn').onclick = changeFighter;
-$('pRematch').onclick = () => { paused = false; show('pause', false); startMatch(); };
-$('pChange').onclick = () => { paused = false; show('pause', false); changeFighter(); };
+$('pRematch').onclick = () => { paused = false; show('pause', false); if (mode === 'smash') return smash.rematch(); startMatch(); };
+$('pChange').onclick = () => { paused = false; show('pause', false); if (mode === 'smash') return smash.toSetup(); changeFighter(); };
 
 /* ---------- online (lockstep: both browsers run the same deterministic sim, only inputs are exchanged) ---------- */
 const DELAY = 4; // input delay in ticks (~67ms); higher = smoother on bad connections
@@ -158,7 +162,12 @@ function renderRooms(list) {
   const box = $('rooms'); box.textContent = '';
   const rooms = (list || []).filter((r) => r && r.code && r.code !== hostingCode);
   if (!rooms.length) { box.textContent = 'No open games yet. Host one and your friends will see it here.'; return; }
-  rooms.forEach((r) => { const b = document.createElement('button'); b.textContent = `${String(r.name || 'Player').slice(0, 14)}'s game   ▶ JOIN`; b.onclick = () => joinCode(r.code); box.append(b); });
+  rooms.forEach((r) => {
+    const b = document.createElement('button'), nm = String(r.name || 'Player').slice(0, 14);
+    if (r.kind === 'smash') { b.textContent = `${nm}'s SMASH room (${r.n || 1}/4)   ▶ JOIN`; b.onclick = () => smash.joinRoom(r.code, myName()); }
+    else { b.textContent = `${nm}'s game   ▶ JOIN`; b.onclick = () => joinCode(r.code); }
+    box.append(b);
+  });
 }
 async function startLobby() {
   stopLobby(); const tok = ++lobbyTok; $('rooms').textContent = 'Looking for games…';
@@ -200,12 +209,15 @@ $('hostBtn').onclick = async () => {
     if (lobby) lobby.setRoom(null); beginOnline(0);
   } catch (e) { show('hostBtn'); show('cancelHost', false); hostingCode = null; if (lobby) lobby.setRoom(null); setStatus('Could not start: ' + (e.message || e)); }
 };
+const myName = () => { const n = ($('pname').value.trim() || 'Player').slice(0, 14); try { localStorage.setItem('brawl-name', n); } catch (e) {} return n; };
+$('hostSmash').onclick = () => smash.hostRoom(myName());
 async function joinCode(code) {
+  if (code.trim().length === 6) return smash.joinRoom(code, myName()); // 6-letter codes are Smash rooms
   net.close(); net = new Net(); mode = 'ai'; setStatus('Joining…');
   try { await net.join(code); beginOnline(1); }
   catch (e) { setStatus(e.message || 'Could not join.'); }
 }
-$('joinBtn').onclick = () => { const code = $('code').value; if (code.trim().length < 4) return setStatus('Enter the code from your friend.'); joinCode(code); };
+$('joinBtn').onclick = () => { const code = $('code').value; if (code.trim().length < 5) return setStatus('Enter the code from your friend.'); joinCode(code); };
 function tryStartOnline() {
   if (!(myPick && theirPick)) return;
   picks = localSlot === 0 ? [myPick, theirPick] : [theirPick, myPick]; startMatch();
@@ -215,9 +227,10 @@ function tryRematch() { if (myRematch && theirRematch) { myRematch = theirRematc
 /* ---------- match ---------- */
 let fighters = [], projectiles = [], wins = [0, 0], round = 1, phase = 'menu', pt = 0, timer = 120 * 60, paused = false, flawless = [true, true];
 const BOUNDS = 9, game = { bounds: BOUNDS }; // expanded arena (was 5.2)
+const edgePosts = [];
 for (const s of [-1, 1]) { // glowing posts mark the edge of the ring
-  const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.4, 0.14), new THREE.MeshBasicMaterial({ color: 0xffd54a })); post.position.set(s * (BOUNDS + 0.55), 1.7, 0); scene.add(post);
-  const gl = stage.glow(0xffd54a, 3); gl.position.set(s * (BOUNDS + 0.55), 2.2, 0); scene.add(gl);
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.4, 0.14), new THREE.MeshBasicMaterial({ color: 0xffd54a })); post.position.set(s * (BOUNDS + 0.55), 1.7, 0); scene.add(post); edgePosts.push(post);
+  const gl = stage.glow(0xffd54a, 3); gl.position.set(s * (BOUNDS + 0.55), 2.2, 0); scene.add(gl); edgePosts.push(gl);
 }
 const coarse = matchMedia('(pointer:coarse)').matches;
 setupTouch();
@@ -247,7 +260,8 @@ function tipsHtml() {
   const k = (a, b) => `<b>${a}</b> ${b}`;
   if (coarse) return `<h4>CONTROLS</h4>Pad (left): move, up = jump (tap up again in the air = double jump), down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('GRAB', 'pick up / throw items')} · ${k('SPECIAL', 'ranged shot, costs 1/4 bar')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
   const p2 = mode === '2p' ? `<br><b>P2:</b> arrows move · U/I punch · J/K kick · L block · O run · <b>P</b> special · <b>;</b> ultimate · <b>/</b> grab/throw` : '';
-  return `<h4>CONTROLS</h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('Q', 'grab / throw items')} <small>(smash crates + barrels: barrels explode!)</small><br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G; costs 1/4 of the SUPER bar)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = this menu.<br>Gamepad: X/Y punch · A/B kick · RB block · LT run · LB grab · RT special · stick click ultimate · Start pause.</small>`;
+  const sm = mode === 'smash' ? '<b>SMASH:</b> damage % climbs; knock rivals off the screen to take a life. <b>Up + SPECIAL in the air</b> = recovery boost · <b>tap down</b> on a floating platform to drop through.<br>' : '';
+  return `<h4>CONTROLS</h4>${sm}<b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('Q', 'grab / throw items')} <small>(smash crates + barrels: barrels explode!)</small><br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G; costs 1/4 of the SUPER bar)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = this menu.<br>Gamepad: X/Y punch · A/B kick · RB block · LT run · LB grab · RT special · stick click ultimate · Start pause.</small>`;
 }
 
 function newRound() {
@@ -337,7 +351,7 @@ function startCutscene(f, summoned) {
   for (let i = 0; i < 22; i++) fx += `<span class="p ${cs.motion || 'rise'}" style="left:${Math.round(Math.random() * 96)}%;font-size:${30 + Math.round(Math.random() * 44)}px;animation-delay:${(Math.random() * 3).toFixed(2)}s;animation-duration:${(2 + Math.random() * 2).toFixed(2)}s">${glyphs[i % glyphs.length]}</span>`;
   c.innerHTML = `<div class="dim"></div><div class="rays"></div><div class="strobe"></div><div class="candle"></div><svg class="ecg" viewBox="0 0 400 60" preserveAspectRatio="none"><path d="M0 30 H110 l8 -26 l12 52 l10 -26 H230 l8 -26 l12 52 l10 -26 H400"/></svg><div class="fx">${fx}</div><div class="cb top"></div><div class="cb bot"></div><div class="who">${f.def.name.toUpperCase()}</div><div class="utitle">${u.name || 'ULTIMATE'}</div>`
     + lines.map((l, i) => `<div class="cl${summoned && i === lines.length - 1 ? ' sum' : ''}" style="animation-delay:${(0.5 + i * per).toFixed(2)}s;animation-duration:${per.toFixed(2)}s">${l}</div>`).join('')
-    + `<div class="skip">${mode === 'online' ? '' : 'tap to skip'}</div>`;
+    + `<div class="skip">${mode === 'online' || (mode === 'smash' && smash.isOnline()) ? '' : 'tap to skip'}</div>`;
   show('cut'); stage.shake += 0.5; sfx(70, 0.9, 'sawtooth', 0.14);
   const el = $('flash'); el.style.transition = 'none'; el.style.opacity = 0.9; requestAnimationFrame(() => { el.style.transition = 'opacity .8s'; el.style.opacity = 0; });
 }
@@ -352,7 +366,7 @@ function cutCamera(dt) { // slow push-in on the caster's upper body
   cam.lookAt(c.x + c.face * 0.2, 1.4, 0);
   if (Math.random() < 0.35) stage.spark(c.x + (Math.random() - 0.5) * 1.6, 0.6 + Math.random() * 1.6, 2, cut.sparkColor, 0.8); // cosmetic
 }
-$('cut').onclick = () => { if (mode !== 'online' && cutT > 0 && CUT_TICKS - cutT > 60) cutT = 1; };
+$('cut').onclick = () => { if (mode !== 'online' && !(mode === 'smash' && smash.isOnline()) && cutT > 0 && CUT_TICKS - cutT > 60) cutT = 1; };
 game.onUlt = (f) => startCutscene(f, trySummon(f)); // the summon roll is part of the sim (seeded RNG)
 game.tryHit = (att, def, m) => {
   if (def.inv > 0 || phase !== 'fight') return false;
@@ -568,7 +582,8 @@ function loop(now) {
   ema += (dt - ema) * 0.04;
   if ((phase === 'fight' || phase === 'intro') && now - lastQ > 3000 && ema > 1 / 40 && quality > 0) { quality--; lastQ = now; applyQuality(); } // sustained <40 fps: lower the load
   if (showFps && now - lastFps > 400) { lastFps = now; $('fps').textContent = `${Math.round(1 / ema)} fps · quality ${quality}`; }
-  if (phase === 'menu') {
+  if (mode === 'smash' && smash.active) smash.frame(now, dt);
+  else if (phase === 'menu') {
     previewRoot.children.forEach((g, i) => { g.rotation.y = Math.sin(now / 900 + i) * 0.8; }); preview.forEach((r) => r && updateFace(r, 1));
     frameCamera(0, 0, 3, 2.3);
   } else {
@@ -603,7 +618,7 @@ function loop(now) {
 }
 const openPause = () => {
   if (!['fight', 'intro', 'end', 'over'].includes(phase)) return;
-  const online = mode === 'online'; if (!online) paused = true;
+  const online = mode === 'online' || (mode === 'smash' && smash.isOnline()); if (!online) paused = true;
   $('pauseTips').innerHTML = tipsHtml() + (online ? '<br><small>Online: the match keeps running while this menu is open.</small>' : '');
   show('pRematch', !online); show('pChange', !online); $('btnMenu').textContent = 'QUIT TO MENU'; show('pause');
 };
@@ -620,7 +635,7 @@ let padWas = false;
 setInterval(() => { const s = padStart(); if (s && !padWas) { if (!$('pause').classList.contains('hidden')) closePause(); else openPause(); } padWas = s; }, 100);
 $('pauseBtn').onclick = openPause;
 
-const V = 25;
+const V = 27;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [
@@ -652,6 +667,19 @@ $('rotOk').onclick = () => show('rotate', false);
 const maybeRotateHint = () => show('rotate', coarse && innerHeight > innerWidth);
 addEventListener('resize', () => { if (innerWidth >= innerHeight) show('rotate', false); });
 if (navigator.standalone || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) show('btnFull', false); // bump to bust browser caches after updates
+const faceUrls = {};
+const faceUrl = (id) => { const t = faceTex[id]; if (!t) return null; return (faceUrls[id] = faceUrls[id] || t.image.toDataURL('image/jpeg', 0.85)); };
+const smash = createSmash({
+  $, show, scene, cam, stage, sfx, banner, toast, coarse,
+  defs: () => defs, makeRig, ghostify, poseUpdate, faceUrl, toonMat,
+  Fighter, MOVES, makeAI, Room,
+  inp: { EMPTY, KEYMAPS, keyboardInput, touchInput, gamepadInput, combine, pack: packInput, unpack: unpackInput },
+  MAPS, getMap: () => mapId, setMap: (id) => pickMap(id), resolveMap, setMapNow: (id) => stage.setMap(id),
+  cut: { active: () => cutT > 0 && !!cut, tick: () => { if (cutT > 0 && --cutT === 0) endCutscene(); }, start: (f, label) => startCutscene(f, label), camera: (dt) => cutCamera(dt), clear: () => { cutT = 0; cut = null; show('cut', false); } },
+  paused: () => paused, setPhase: (p) => { if (p === 'fight' && phase !== 'fight') scheduleAds(); phase = p; }, setMode: (m) => { mode = m; },
+  clearClassic: () => clearFighters(), setPosts: (v) => edgePosts.forEach((o) => (o.visible = v)),
+  lobbySet: (r) => { if (lobby) lobby.setRoom(r); }, lobbyStop: () => stopLobby(), setHosting: (c) => { hostingCode = c; }, setStatus, goMenu: () => goMenu(),
+});
 async function boot() {
   await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
   const withFace = defs.filter((d) => d.face).length;
@@ -680,7 +708,7 @@ async function boot() {
   openGate();
 }
 boot().catch((e) => { $('loading').classList.remove('hidden'); $('loading').textContent = 'Failed to load. Run the game through a web server (see README). ' + e; });
-window.__game = { get props() { return props; }, get items() { return items; }, get thrown() { return thrown; }, get defs() { return defs; }, get fighters() { return fighters; }, get phase() { return phase; }, get tick() { return simTick; } };
+window.__game = { get smash() { return smash.debug(); }, get props() { return props; }, get items() { return items; }, get thrown() { return thrown; }, get defs() { return defs; }, get fighters() { return fighters; }, get phase() { return phase; }, get tick() { return simTick; } };
 
 // Balance testing hook: plays CPU-vs-CPU matches synchronously and returns win counts. Usage (browser console): __sim('auburn','bruiser',10,1)
 window.__sim = (idA, idB, n = 1, level = 1) => {

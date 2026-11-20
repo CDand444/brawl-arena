@@ -74,6 +74,23 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
 #backup{top:96px!important}#combo{top:124px!important}
 body.paused #touch,body.paused #pauseBtn,body.paused #fsBtn{display:none}
 @media (max-height:520px){#pauseBtn,#fsBtn{top:44px!important}#backup{top:74px!important}#combo{top:98px!important;font-size:22px!important}}
+#sStall{position:fixed;left:50%;top:40%;transform:translateX(-50%);background:#000c;border:2px solid #ffd54a;border-radius:10px;padding:10px 18px;font:18px Impact,sans-serif;letter-spacing:1px;color:#ffd54a;z-index:8}
+#sSlots{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.scard{width:min(190px,44vw);background:#1a1424e6;border:3px solid var(--pc);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:5px}
+.scard.off{opacity:.45}.scard .sp{font:22px Impact,sans-serif;color:var(--pc)}
+.scard .sface{width:64px;height:64px;border-radius:50%;border:3px solid var(--pc);background:#333 center/cover}
+.scard .sname{font-size:16px;min-height:20px;text-align:center}.scard .arr{display:flex;gap:6px}.scard .arr button{font-size:14px;padding:4px 12px}
+.scard .stype{font:13px system-ui,sans-serif;padding:6px 8px;width:100%}.scard button:disabled{opacity:.5;cursor:default}
+.sopts{display:flex;gap:8px;align-items:center;font:16px Impact,sans-serif;color:#ffd54a}.sopts button{font-size:16px;padding:2px 12px}.sopts b{min-width:22px;text-align:center;color:#fff}
+#sMaps{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}.srow{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+#shud{position:fixed;left:0;right:0;bottom:8px;display:flex;justify-content:center;gap:8px;pointer-events:none;z-index:3;padding:0 6px}
+.shc{width:min(180px,24vw);background:#000a;border:2px solid var(--pc);border-radius:10px;padding:4px 8px;display:flex;gap:8px;align-items:center}
+.shc .f{width:40px;height:40px;border-radius:50%;border:2px solid var(--pc);background:#333 center/cover;flex:none}
+.shc .pc{font:30px Impact,sans-serif;line-height:1;text-shadow:0 2px 0 #000}.shc .nm{font:11px system-ui,sans-serif;color:#ddd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shc .st{color:var(--pc);font-size:12px;letter-spacing:1px}.shc .mb{height:4px;background:#012;margin-top:2px}.shc .mb i{display:block;height:100%;width:0;background:#7fe8ff}
+.shc.out{opacity:.35}
+@media (pointer:coarse){#shud{bottom:auto;top:4px}.shc .f{width:30px;height:30px}.shc .pc{font-size:22px}}
+@media (max-height:520px){#smashSetup{gap:6px}.scard{width:min(170px,23vw);padding:5px;gap:3px}.scard .sface{width:44px;height:44px}}
 #flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
 #tips{position:fixed;left:10px;top:96px;max-width:min(360px,74vw);background:#000b;border:2px solid #ffd54a;border-radius:10px;padding:8px 12px;font:13px/1.55 system-ui,sans-serif;cursor:pointer;z-index:5}
 #tips h4{margin:0 0 4px;color:#ffd54a;font:15px Impact,sans-serif;letter-spacing:1px}#tips i{font:11px system-ui;color:#aaa}#tips b{color:#ffd54a}#tips small{color:#bbb}
@@ -109,6 +126,7 @@ body.paused #touch,body.paused #pauseBtn,body.paused #fsBtn{display:none}
 
 <div id="menu" class="screen hidden">
   <h1>BRAWL ARENA</h1>
+  <button id="btnSmash" style="background:#1a4aa8">SMASH (up to 4 players)</button>
   <button id="btnArcade">ARCADE (fight everyone)</button>
   <button id="btn1p">1 PLAYER vs CPU</button>
   <button id="btn2p">2 PLAYERS (one keyboard)</button>
@@ -125,12 +143,24 @@ body.paused #touch,body.paused #pauseBtn,body.paused #fsBtn{display:none}
 <div id="online" class="screen hidden" style="background:#000b">
   <h1 style="font-size:clamp(28px,6vw,56px)">ONLINE</h1>
   <div style="display:flex;gap:8px;align-items:center">Your name <input id="pname" maxlength="14" placeholder="Player" style="font:inherit;font-size:18px;width:150px;text-align:center;border-radius:8px;border:2px solid #ffd54a;user-select:text;-webkit-user-select:text"></div>
-  <div style="display:flex;gap:8px"><button id="hostBtn">HOST A GAME</button><button id="cancelHost" class="hidden" style="background:#333">CANCEL</button></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center"><button id="hostSmash" style="background:#1a4aa8">HOST SMASH ROOM (up to 4)</button><button id="hostBtn">HOST 1v1 GAME</button><button id="cancelHost" class="hidden" style="background:#333">CANCEL</button></div>
   <div class="help" style="width:min(440px,92vw)"><b>OPEN GAMES (live)</b><div id="rooms" style="margin-top:6px">Looking for games…</div></div>
-  <details class="help"><summary style="cursor:pointer">Join with a code instead</summary><div style="display:flex;gap:8px;margin-top:6px;justify-content:center"><input id="code" maxlength="5" placeholder="CODE" autocapitalize="characters" style="font:inherit;font-size:22px;width:120px;text-align:center;text-transform:uppercase;border-radius:8px;border:2px solid #ffd54a;user-select:text;-webkit-user-select:text"><button id="joinBtn">JOIN</button></div></details>
+  <details class="help"><summary style="cursor:pointer">Join with a code instead</summary><div style="display:flex;gap:8px;margin-top:6px;justify-content:center"><input id="code" maxlength="6" placeholder="CODE" autocapitalize="characters" style="font:inherit;font-size:22px;width:120px;text-align:center;text-transform:uppercase;border-radius:8px;border:2px solid #ffd54a;user-select:text;-webkit-user-select:text"><button id="joinBtn">JOIN</button></div></details>
   <div id="onStatus" class="help" style="min-height:1.5em"></div>
   <button id="onBack" style="font-size:14px">Back</button>
 </div>
+
+<div id="smashSetup" class="screen hidden" style="background:#000b">
+  <h1 style="font-size:clamp(26px,5vw,48px)">SMASH <small style="font-size:.4em;letter-spacing:1px">free-for-all · up to 4</small></h1>
+  <div id="sRoomInfo" class="help hidden"></div>
+  <div id="sSlots"></div>
+  <div class="sopts"><span>LIVES</span><button id="sLess">−</button><b id="sStocks">3</b><button id="sMore">+</button></div>
+  <div id="sMaps"></div>
+  <div class="srow"><button id="sStart">FIGHT!</button><button id="sBack" style="background:#333">BACK</button></div>
+  <div id="sNote" class="help" style="min-height:1.2em"></div>
+</div>
+<div id="sEnd" class="screen hidden" style="background:#000a"><h1 id="sWin" style="font-size:clamp(26px,6vw,60px)"></h1><div id="sPlaces" class="help" style="font-size:18px;line-height:1.7"></div>
+  <div class="srow"><button id="sRematch">REMATCH</button><button id="sSetup">CHANGE FIGHTERS</button><button id="sMenu" style="background:#333">MENU</button></div><div id="sEndNote" class="help"></div></div>
 
 <div id="select" class="screen hidden">
   <h1 style="font-size:clamp(24px,5vw,44px)" id="selTitle">Choose your fighter</h1>
@@ -144,7 +174,7 @@ body.paused #touch,body.paused #pauseBtn,body.paused #fsBtn{display:none}
   <div id="timer">99</div>
   <div class="side"><div class="nm" id="n1"></div><div class="bar"><div id="hp1"></div></div><div class="meter"><div id="m1"></div></div><div class="hold" id="h1"></div><div class="pips" id="p1"></div></div>
 </div>
-<div id="flash"></div><div id="cut" class="hidden"></div><div id="fps" class="hidden"></div><div id="backup" class="hidden"></div><div id="ad" class="hidden"></div><div id="toast" class="hidden"></div><button id="fsBtn" class="hidden">⛶</button>
+<div id="flash"></div><div id="shud" class="hidden"></div><div id="sStall" class="hidden">Waiting for players…</div><div id="cut" class="hidden"></div><div id="fps" class="hidden"></div><div id="backup" class="hidden"></div><div id="ad" class="hidden"></div><div id="toast" class="hidden"></div><button id="fsBtn" class="hidden">⛶</button>
 <div id="rotate" class="hidden"><div>📱↻ Turn your phone sideways for the best view</div><div style="margin-top:10px"><button id="rotFs">FULL SCREEN</button> <button id="rotOk" style="background:#333">OK</button></div></div>
 <div id="banner" class="hidden"></div><div id="combo"></div>
 <div id="endbar" class="hidden"><button id="rematch">REMATCH</button><button id="changeBtn">CHANGE FIGHTER</button><button id="menuBtn2">MENU</button></div>
@@ -162,7 +192,7 @@ body.paused #touch,body.paused #pauseBtn,body.paused #fsBtn{display:none}
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="src/game.js?v=25"></script>
+<script type="module" src="src/game.js?v=27"></script>
 <script>
 // pause button visible only while fighting
 new MutationObserver(()=>{document.body.classList.toggle('paused',!document.getElementById('pause').classList.contains('hidden'))}).observe(document.getElementById('pause'),{attributes:true});

@@ -87,3 +87,43 @@ export class Lobby {
   stopPeer() { try { this.peer && this.peer.destroy(); } catch (e) {} this.peer = null; this.role = null; this.up = null; this.conns.clear(); this.rooms.clear(); }
   stop() { this.dead = true; this.stopPeer(); this.onRooms([]); }
 }
+
+/** Smash room: one host, up to 3 guests (star network). Guests only talk to the host; the host relays. */
+export class Room {
+  constructor() { this.peer = null; this.peers = new Map(); this.up = null; this.isHost = false; this.code = null; this.queue = []; this.h = null; }
+  /** Attach handlers ({ msg(m, from), join(id), leave(id) }); flushes anything that arrived before. */
+  listen(h) { this.h = h; const q = this.queue; this.queue = []; for (const [kind, a, b] of q) this.emit(kind, a, b); }
+  emit(kind, a, b) { if (!this.h) { this.queue.push([kind, a, b]); return; } if (this.h[kind]) this.h[kind](a, b); }
+  host() {
+    return new Promise((resolve, reject) => {
+      const code = Array.from({ length: 6 }, () => ALPHABET[(Math.random() * ALPHABET.length) | 0]).join('');
+      this.code = code; this.isHost = true;
+      const p = new Peer(PREFIX + 'room-' + code); this.peer = p;
+      p.on('open', () => resolve(code));
+      p.on('error', (e) => reject(e));
+      p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+      p.on('connection', (c) => {
+        c.on('open', () => { this.peers.set(c.peer, c); this.emit('join', c.peer); });
+        c.on('data', (m) => this.emit('msg', m, c.peer));
+        c.on('close', () => { if (this.peers.delete(c.peer)) this.emit('leave', c.peer); });
+      });
+    });
+  }
+  join(code) {
+    return new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('Could not reach that room. Check the code.')), 15000);
+      const p = new Peer(); this.peer = p;
+      p.on('error', (e) => { clearTimeout(t); reject(e); });
+      p.on('open', () => {
+        const c = p.connect(PREFIX + 'room-' + code.trim().toUpperCase(), { reliable: true });
+        c.on('open', () => { clearTimeout(t); this.up = c; resolve(); });
+        c.on('data', (m) => this.emit('msg', m, 'host'));
+        c.on('close', () => this.emit('leave', 'host'));
+      });
+    });
+  }
+  send(m, to) { if (this.isHost) { const c = this.peers.get(to); if (c && c.open) c.send(m); } else if (this.up && this.up.open) this.up.send(m); }
+  broadcast(m, except) { if (!this.isHost) return this.send(m); for (const [id, c] of this.peers) if (id !== except && c.open) c.send(m); }
+  kick(id) { const c = this.peers.get(id); if (c) { this.peers.delete(id); try { c.close(); } catch (e) {} } }
+  close() { this.h = null; try { this.peer && this.peer.destroy(); } catch (e) {} this.peers.clear(); this.up = null; this.peer = null; }
+}
