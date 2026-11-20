@@ -56,6 +56,7 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
   <button id="btn1p">1 PLAYER vs CPU</button>
   <button id="btn2p">2 PLAYERS (one keyboard)</button>
   <button id="btnOnline">ONLINE (2 devices)</button>
+  <div id="faceStatus" class="help" style="padding:4px 10px"></div><button id="btnFaces" class="hidden" style="font-size:15px;padding:6px 12px">🔓 UNLOCK REAL FACES</button>
   <label>CPU difficulty <select id="diff"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option></select></label>
   <div class="help"><b>P1:</b> move WASD · LP F · HP G · LK C · HK V · Block Shift · Run X<br>
   <b>P2:</b> move arrows · LP U · HP I · LK J · HK K · Block L · Run O (or numpad 4/5/1/2/0/3)<br>
@@ -98,7 +99,7 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="src/game.js"></script>
+<script type="module" src="src/game.js?v=3"></script>
 <script>
 // pause button visible only while fighting
 new MutationObserver(()=>{document.getElementById('pauseBtn').classList.toggle('hidden',document.getElementById('hud').classList.contains('hidden'))}).observe(document.getElementById('hud'),{attributes:true});

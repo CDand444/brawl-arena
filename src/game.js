@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace } from './model.js';
-import { loadFaces, canDecrypt } from './faces.js';
-import { Fighter, MOVES } from './fighter.js';
-import { makeAI } from './ai.js';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js';
-import { Net, packInput, unpackInput } from './net.js';
-import { buildStage } from './stage.js';
+import { buildCharacter, applyPose, applyFace } from './model.js?v=3';
+import { loadFaces, canDecrypt } from './faces.js?v=3';
+import { Fighter, MOVES } from './fighter.js?v=3';
+import { makeAI } from './ai.js?v=3';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=3';
+import { Net, packInput, unpackInput } from './net.js?v=3';
+import { buildStage } from './stage.js?v=3';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -41,8 +41,8 @@ let actx; const sfx = (f, d = 0.08, type = 'square', v = 0.05) => {
 /* ---------- characters ---------- */
 let defs = [];
 async function loadCharacters() {
-  const ids = await (await fetch('characters/index.json')).json();
-  defs = await Promise.all(ids.map(async (id) => ({ id, ...(await (await fetch(`characters/${id}.json`)).json()) })));
+  const ids = await (await fetch('characters/index.json?v=' + V)).json();
+  defs = await Promise.all(ids.map(async (id) => ({ id, ...(await (await fetch(`characters/${id}.json?v=${V}`)).json()) })));
 }
 const faceTex = {};
 function makeRig(def) { const rig = buildCharacter(def); if (faceTex[def.id]) applyFace(rig, faceTex[def.id], def.face); return rig; }
@@ -288,21 +288,31 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
+const V = 3; // bump to bust browser caches after updates
 async function boot() {
   await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
-  const anyFace = defs.some((d) => d.face);
-  if (!anyFace || !canDecrypt()) return show('menu');
-  const tryPw = async (pw) => { Object.assign(faceTex, await loadFaces(defs, pw)); try { localStorage.setItem('brawl-pw', pw); } catch (e) {} };
+  const withFace = defs.filter((d) => d.face).length;
+  const setFaceStatus = (t, btn) => { $('faceStatus').textContent = t; show('btnFaces', !!btn); };
+  if (!withFace) return show('menu');
+  if (!canDecrypt()) { setFaceStatus('Real faces need a secure (https) page. Using stylized fighters.', false); return show('menu'); }
+  const tryPw = async (pw) => {
+    const t = await loadFaces(defs, pw); Object.assign(faceTex, t);
+    try { localStorage.setItem('brawl-pw', pw); } catch (e) {}
+    setFaceStatus(`Real faces unlocked (${Object.keys(t).length}/${withFace}).`, false); buildSelect();
+  };
+  const openGate = () => { show('menu', false); show('gate'); $('gateMsg').textContent = ''; $('pw').focus(); };
   let saved = null; try { saved = localStorage.getItem('brawl-pw'); } catch (e) {}
-  if (saved) { try { await tryPw(saved); return show('menu'); } catch (e) { /* ask again */ } }
-  show('gate');
+  setFaceStatus('Faces locked. Using stylized fighters.', true);
+  $('btnFaces').onclick = openGate;
+  $('pwSkip').onclick = () => { show('gate', false); show('menu'); };
   const unlock = async () => {
     $('gateMsg').textContent = 'Checking…';
     try { await tryPw($('pw').value); show('gate', false); show('menu'); }
-    catch (e) { $('gateMsg').textContent = 'Wrong password.'; }
+    catch (e) { console.warn('face unlock failed', e); $('gateMsg').textContent = /password/i.test(String(e.message)) || e.name === 'OperationError' ? 'Wrong password.' : 'Could not load photos: ' + (e.message || e); }
   };
   $('pwOk').onclick = unlock; $('pw').onkeydown = (e) => { if (e.key === 'Enter') unlock(); };
-  $('pwSkip').onclick = () => { show('gate', false); show('menu'); };
+  if (saved) { try { await tryPw(saved); return show('menu'); } catch (e) { console.warn('saved password failed', e); } }
+  openGate();
 }
 boot().catch((e) => { $('loading').classList.remove('hidden'); $('loading').textContent = 'Failed to load. Run the game through a web server (see README). ' + e; });
 window.__game = { get fighters() { return fighters; }, get phase() { return phase; }, get tick() { return simTick; } };
