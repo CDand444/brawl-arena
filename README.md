@@ -35,6 +35,10 @@ extras[nosering|necklace|choker|glasses|watch], stats{speed,power,health ~0.85-1
 ## Code map
 `src/model.js` builds the 3D model and poses · `src/fighter.js` moves + combat · `src/ai.js` CPU · `src/input.js` keyboard/touch · `src/game.js` stage, UI, rounds.
 
+## Fighting feel
+Double jump (tap jump again in the air), 7-tick input buffer, chain cancels (a connecting light attack can cancel into a different normal or special, max 3),
+smooth walk acceleration, air steering + fast-fall (hold down), impact freeze-frames (hitstop), and attacker pushback when the opponent is cornered.
+
 ## Special moves
 - **Ranged special** (P1 `E` / P2 `P`, or down, down-forward, forward + punch): per character via `special.type` in JSON: `fireball` (mid height: duck it), `low` (ground wave: jump it), `fast` (quick, weaker).
 - **Ultimate** (P1 `R` / P2 `;`, or down, down-forward, forward + HK): needs a full blue SUPER bar (fills by hitting and being hit). Fast, unblockable, 30 damage,

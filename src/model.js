@@ -175,6 +175,7 @@ export const POSES = {
   run: (u) => { const s = Math.sin(u * 0.42), c = Math.cos(u * 0.42);
     return P({ lL: 1.0 * s, lR: -1.0 * s, lLk: 0.4 + 1.2 * Math.max(0, -c), lRk: 0.4 + 1.2 * Math.max(0, c), aL: -0.9 - 0.9 * s, aR: -0.9 + 0.9 * s, aLe: -1.6, aRe: -1.6, lean: 0.45 }); },
   jump: () => P({ lL: -0.9, lR: -0.4, lLk: 1.2, lRk: 0.9, aL: -2.4, aR: -2.4, aLe: -0.4, aRe: -0.4, lean: 0 }),
+  djump: () => P({ lL: -1.5, lR: -1.3, lLk: 2.0, lRk: 1.9, aL: -1.2, aR: -1.2, aLe: -2.2, aRe: -2.2, lean: 0.6 }),
   crouch: () => P({ drop: -0.38, lL: -1.2, lR: -1.2, lLk: 1.8, lRk: 1.8, lean: 0.3, aL: -0.9, aR: -0.9 }),
   block: () => P({ aL: -1.2, aR: -1.3, aLe: -2.3, aRe: -2.4, aLz: 0.05, aRz: -0.05, lean: 0.15 }),
   crouchblock: () => P({ drop: -0.38, lL: -1.2, lR: -1.2, lLk: 1.8, lRk: 1.8, lean: 0.35, aL: -1.2, aR: -1.3, aLe: -2.3, aRe: -2.4 }),

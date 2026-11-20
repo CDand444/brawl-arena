@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=8';
-import { loadFaces, canDecrypt } from './faces.js?v=8';
-import { Fighter, MOVES } from './fighter.js?v=8';
-import { makeAI } from './ai.js?v=8';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=8';
-import { Net, packInput, unpackInput } from './net.js?v=8';
-import { buildStage } from './stage.js?v=8';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=11';
+import { loadFaces, canDecrypt } from './faces.js?v=11';
+import { Fighter, MOVES } from './fighter.js?v=11';
+import { makeAI } from './ai.js?v=11';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=11';
+import { Net, packInput, unpackInput } from './net.js?v=11';
+import { buildStage, MAPS } from './stage.js?v=11';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -15,6 +15,10 @@ const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, alph
 const scene = new THREE.Scene();
 const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
 const stage = buildStage(scene, renderer);
+let mapId = 'temple'; try { mapId = localStorage.getItem('brawl-map') || 'temple'; } catch (e) {}
+if (mapId !== 'random' && !MAPS.some((m) => m.id === mapId)) mapId = 'temple';
+stage.setMap(mapId === 'random' ? 'temple' : mapId);
+const resolveMap = () => (mapId === 'random' ? MAPS[(Math.random() * MAPS.length) | 0].id : mapId);
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(w, h, false);
@@ -67,15 +71,27 @@ function buildSelect() {
   });
 }
 function choose(d) {
-  if (mode === 'online') { myPick = d; net.send({ t: 'pick', id: d.id }); setPreview(0, d); $('selTitle').textContent = 'Waiting for opponent to choose…'; tryStartOnline(); return; }
+  if (mode === 'online') { myPick = d; const mp = resolveMap(); if (localSlot === 0) stage.setMap(mp); net.send({ t: 'pick', id: d.id, map: mp }); setPreview(0, d); $('selTitle').textContent = 'Waiting for opponent to choose…'; tryStartOnline(); return; }
   picks[step] = d;
   if (step === 0) { step = 1; $('selTitle').textContent = mode === 'ai' ? 'Choose your opponent' : 'Player 2: choose your fighter'; setPreview(1, null); }
   else startMatch();
+}
+function buildMapChips() {
+  const box = $('maps'); box.innerHTML = '<span>STAGE</span>';
+  [...MAPS, { id: 'random', name: '🎲 Random' }].forEach((m) => {
+    const b = document.createElement('button'); b.className = 'chip' + (m.id === mapId ? ' on' : ''); b.textContent = m.name; b.onclick = () => pickMap(m.id); box.append(b);
+  });
+}
+function pickMap(id) {
+  mapId = id; try { localStorage.setItem('brawl-map', id); } catch (e) {}
+  if (id !== 'random') stage.setMap(id); // live preview behind the select screen
+  buildMapChips();
 }
 function openSelect() {
   show('menu', false); show('select'); show('hud', false); show('touch', false); show('endbar', false);
   step = 0; picks = []; $('selTitle').textContent = mode === 'p2' ? 'Player 1: choose your fighter' : 'Choose your fighter';
   $('randBtn').classList.toggle('hidden', false);
+  buildMapChips(); $('maps').classList.toggle('hidden', mode === 'online' && localSlot === 1);
   setPreview(0, null); setPreview(1, null); previewRoot.visible = true; fighters.forEach((f) => scene.remove(f.rig.root)); fighters = []; phase = 'menu';
 }
 $('btn1p').onclick = () => { mode = 'ai'; openSelect(); };
@@ -85,7 +101,7 @@ $('diff').onchange = (e) => (diff = +e.target.value);
 function goMenu() {
   if (mode === 'online') { net.close(); net = new Net(); }
   mode = 'ai'; phase = 'menu'; clearFighters(); previewRoot.visible = true; setPreview(0, null); setPreview(1, null); paused = false;
-  ['select', 'hud', 'touch', 'endbar', 'pause', 'online', 'banner', 'tips', 'tipsBtn'].forEach((i) => show(i, false)); show('menu');
+  ['select', 'hud', 'touch', 'endbar', 'pause', 'online', 'banner', 'tips', 'tipsBtn', 'fsBtn', 'rotate', 'ad'].forEach((i) => show(i, false)); show('menu');
 }
 $('btnMenu').onclick = $('menuBtn2').onclick = goMenu;
 $('rematch').onclick = () => {
@@ -104,7 +120,7 @@ $('onBack').onclick = () => { net.close(); net = new Net(); show('online', false
 function wireNet() {
   net.onmsg = (m) => {
     if (m.t === 'in') remoteBuf[m.k] = unpackInput(m.v);
-    else if (m.t === 'pick') { theirPick = defs.find((d) => d.id === m.id) || null; tryStartOnline(); }
+    else if (m.t === 'pick') { theirPick = defs.find((d) => d.id === m.id) || null; if (m.map && localSlot === 1) stage.setMap(m.map); tryStartOnline(); }
     else if (m.t === 'rematch') { theirRematch = true; tryRematch(); }
   };
   net.onclose = () => {
@@ -143,7 +159,7 @@ setupTouch();
 function clearFighters() { fighters.forEach((f) => scene.remove(f.rig.root)); fighters = []; projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = []; }
 
 function startMatch() {
-  show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters();
+  show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters(); if (mode !== 'online') stage.setMap(resolveMap());
   const kb1 = mode === 'ai' ? combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput()) : keyboardInput(KEYMAPS.p1);
   fighters = [
     new Fighter(picks[0], makeRig(picks[0]), 0, kb1),
@@ -159,19 +175,20 @@ function startMatch() {
   $('n0').textContent = picks[0].name; $('n1').textContent = mode === 'ai' ? picks[1].name + ' (CPU)' : picks[1].name;
   wins = [0, 0]; round = 1; flawless = [true, true];
   show('hud'); show('touch', coarse && mode !== 'p2'); show('rematch'); $('rematch').textContent = 'REMATCH'; paused = false; show('pause', false);
-  newRound(); showTips(true); show('tipsBtn');
+  scheduleAds(); newRound(); showTips(true); show('tipsBtn'); show('fsBtn'); maybeRotateHint();
 }
 function tipsHtml() {
   const k = (a, b) => `<b>${a}</b> ${b}`;
-  if (coarse) return `<h4>HOW TO FIGHT <i>(tap to close)</i></h4>Pad (left): move, up = jump, down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('SPECIAL', 'ranged shot')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
+  if (coarse) return `<h4>HOW TO FIGHT <i>(tap to close)</i></h4>Pad (left): move, up = jump (tap up again in the air = double jump), down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('SPECIAL', 'ranged shot')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
   const p2 = mode === '2p' ? `<br><b>P2:</b> arrows move · U/I punch · J/K kick · L block · O run · <b>P</b> special · <b>;</b> ultimate` : '';
-  return `<h4>HOW TO FIGHT <i>(click to close)</i></h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked. Esc = pause.</small>`;
+  return `<h4>HOW TO FIGHT <i>(click to close)</i></h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = pause.</small>`;
 }
 function showTips(on = true) { $('tips').innerHTML = tipsHtml(); show('tips', on); }
 $('tips').onclick = () => show('tips', false);
 $('tipsBtn').onclick = () => showTips($('tips').classList.contains('hidden'));
 
 function newRound() {
+  hitstop = 0;
   projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = [];
   fighters[0].reset(-2); fighters[1].reset(2);
   timer = 99 * 60; phase = 'intro'; pt = 0; banner(`ROUND ${round}`);
@@ -181,7 +198,8 @@ function banner(t, sub = '') { $('banner').innerHTML = t + (sub ? `<small>${sub}
 
 // Ranged special types (set per character in JSON: special.type): fireball = mid height (duck it), low = ground wave (jump it), fast = quick shot
 const SPECIALS = { fireball: { py: 1.35, speed: 0.12, dmg: 10, size: 0.28 }, low: { py: 0.45, speed: 0.14, dmg: 8, size: 0.3, low: true }, fast: { py: 1.35, speed: 0.2, dmg: 7, size: 0.22 } };
-let ultT = 0;
+let ultT = 0, hitstop = 0; // hitstop = freeze-frames on impact (part of the sim, so identical on both machines online)
+game.onDJ = (f) => { stage.spark(f.x, f.y + 0.15, 8, 0xffffff, 0.6); sfx(520, 0.08, 'triangle', 0.04); }; // cosmetic
 game.spawnProjectile = (f, kind = 'fb') => {
   const ult = kind === 'ult', sp = ult ? { py: 1.1, speed: 0.26, dmg: MOVES.ult.dmg, size: 0.7 } : (SPECIALS[f.def.special?.type] || SPECIALS.fireball);
   const color = css(ult ? (f.def.ultimate?.color ?? f.def.special?.color ?? '#ffffff') : (f.def.special?.color ?? '#ff7a1a'));
@@ -205,6 +223,8 @@ game.tryHit = (att, def, m) => {
   const a = att.x, b = att.x + att.face * m.reach;
   if (Math.min(a, b) - 0.3 > def.x || Math.max(a, b) + 0.3 < def.x) return false;
   const r = def.receive(att, m, game);
+  hitstop = Math.max(hitstop, r === 'block' ? 2 : Math.min(7, 2 + Math.round(m.dmg / 3)));
+  if (Math.abs(def.x) >= game.bounds - 0.05) att.vx = -att.face * ((m.kb || 0.05) + 0.04); // cornered: attacker gets pushed back instead
   sfx(r === 'block' ? 120 : 200, 0.09, r === 'block' ? 'triangle' : 'square', r === 'block' ? 0.05 : 0.09);
   const hx = def.x - att.face * 0.25, hy = Math.max(0.4, def.y + (m.y[0] + m.y[1]) / 2 - att.y);
   if (r === 'block') stage.spark(hx, hy, 5, 0x9ab8ff, 0.7);
@@ -221,7 +241,7 @@ function step60() {
   const none = EMPTY();
   const [a, b] = fighters;
   if (ultT > 0 && --ultT === 0 && phase === 'fight') banner('');
-  if (phase === 'fight') { timer--; a.update(b, game); b.update(a, game); }
+  if (phase === 'fight') { if (hitstop > 0) { hitstop--; a.poll(); b.poll(); } else { timer--; a.update(b, game); b.update(a, game); } }
   else { a.update(b, game, none); b.update(a, game, none); }
   // separation
   if (a.grounded && b.grounded && Math.abs(a.x - b.x) < 0.7) {
@@ -235,6 +255,7 @@ function step60() {
     const t = p.owner === a ? b : a, top = t.y + (t.crouching ? 1.25 : 1.95);
     if (phase === 'fight' && Math.abs(p.x - t.x) < 0.45 + (p.ult ? 0.3 : 0) && p.py + p.hh >= t.y && p.py - p.hh <= top && t.inv === 0 && t.state !== 'down' && t.state !== 'getup') {
       p.dead = true; stage.spark(p.x, p.py, p.ult ? 40 : 22, p.ult ? 0xffffff : 0xff9a3a, p.ult ? 2 : 1.4); stage.shake += p.ult ? 1 : 0.5;
+      hitstop = Math.max(hitstop, p.ult ? 8 : 4);
       t.receive(p.owner, { dmg: p.dmg, kb: p.ult ? 0.2 : 0.1, hs: 22, bs: 14, knock: true, low: p.low, unblockable: p.unblockable }, game); sfx(160, 0.15, 'sawtooth', 0.09);
     }
     if (Math.abs(p.x) > 12) p.dead = true;
@@ -306,6 +327,8 @@ function loop(now) {
       $('timer').textContent = Math.max(0, Math.ceil(timer / 60));
     }
   }
+  if (phase === 'fight' && !paused && !adOpen() && now > nextAdAt) showAd();
+  if (phase !== 'fight' && phase !== 'intro' && phase !== 'end' && adOpen()) show('ad', false);
   stage.update(now, dt);
   const sh = stage.shake * 0.14, ox = (Math.random() - 0.5) * sh, oy = (Math.random() - 0.5) * sh;
   cam.position.x += ox; cam.position.y += oy; renderer.render(scene, cam); cam.position.x -= ox; cam.position.y -= oy;
@@ -314,7 +337,37 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-const V = 8; // bump to bust browser caches after updates
+const V = 11;
+/* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
+const ADS = [
+  `<div class="adh">GAMER ALERT!!</div><div class="ps3"><div class="slab"><i></i>PS3</div></div><div class="adt">PS3: "barely used, only played on weekends"</div><div class="adp">$49 OBO · controller sold separately · yes, it still plays Blu-ray</div><button>BUY NOW (not real)</button>`,
+  `<div class="adh">DAD ALERT!!</div><div class="grill"><div class="smoke"></div><div class="lid"></div><div class="body"></div><div class="legs"></div></div><div class="adt">Traeger Grills</div><div class="adp">Set it. Forget it. Brag about it. Pellets sold separately. Ask your dad.</div><button>BUY NOW (not real)</button>`,
+];
+let adIdx = 0, nextAdAt = Infinity;
+const adOpen = () => !$('ad').classList.contains('hidden');
+function closeAd() { show('ad', false); nextAdAt = performance.now() + 45000 + Math.random() * 30000; }
+function showAd() {
+  $('ad').innerHTML = `<span class="tag">AD · fake, just for laughs</span><span class="x">✕</span>${ADS[adIdx++ % ADS.length]}<div class="tap">tap anywhere on this ad to close</div>`;
+  show('ad'); sfx(660, 0.12, 'triangle', 0.05);
+}
+$('ad').onclick = closeAd;
+const scheduleAds = () => { nextAdAt = performance.now() + 20000; show('ad', false); };
+
+/* ---------- full screen + rotate ---------- */
+function toast(t) { const el = $('toast'); el.textContent = t; show('toast'); clearTimeout(toast.h); toast.h = setTimeout(() => show('toast', false), 5000); }
+async function toggleFullscreen() {
+  const d = document, el = d.documentElement;
+  if (d.fullscreenElement || d.webkitFullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen).call(d); try { screen.orientation.unlock(); } catch (e) {} return; }
+  const req = el.requestFullscreen || el.webkitRequestFullscreen;
+  if (!req) return toast('Full screen is not available in this browser. On iPhone: tap Share, then Add to Home Screen, and open it from there.');
+  try { await req.call(el, { navigationUI: 'hide' }); } catch (e) { return toast('Full screen was blocked by the browser.'); }
+  try { await screen.orientation.lock('landscape'); } catch (e) { /* not supported (e.g. desktop/iOS): fine */ }
+}
+['btnFull', 'fsBtn', 'rotFs'].forEach((id) => ($(id).onclick = toggleFullscreen));
+$('rotOk').onclick = () => show('rotate', false);
+const maybeRotateHint = () => show('rotate', coarse && innerHeight > innerWidth);
+addEventListener('resize', () => { if (innerWidth >= innerHeight) show('rotate', false); });
+if (navigator.standalone || matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches) show('btnFull', false); // bump to bust browser caches after updates
 async function boot() {
   await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
   const withFace = defs.filter((d) => d.face).length;
