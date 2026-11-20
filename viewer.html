@@ -1,0 +1,28 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Character Viewer</title><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>html,body{margin:0;height:100%;background:#1b1d26;color:#eee;font:14px system-ui}canvas{position:fixed;inset:0;width:100%;height:100%}
+#p{position:fixed;left:8px;top:8px;width:340px;max-width:90vw;display:flex;flex-direction:column;gap:6px}
+textarea{height:46vh;background:#111;color:#9f9;border:1px solid #444;font:12px monospace}select{padding:4px}#err{color:#f77}</style></head><body>
+<canvas id="c"></canvas>
+<div id="p"><select id="who"></select><select id="pose"></select><textarea id="t" spellcheck="false"></textarea><div id="err"></div>
+<small>Edit the JSON live. Save it as characters/&lt;id&gt;.json and add the id to characters/index.json.</small></div>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+import { buildCharacter, applyPose, POSES } from './src/model.js';
+const $=i=>document.getElementById(i);
+const r=new THREE.WebGLRenderer({canvas:$('c'),antialias:true});r.shadowMap.enabled=true;
+const s=new THREE.Scene();s.background=new THREE.Color(0x1b1d26);
+const cam=new THREE.PerspectiveCamera(35,1,.1,50);cam.position.set(0,1.5,6.5);cam.lookAt(0,1.05,0);
+s.add(new THREE.HemisphereLight(0xffffff,0x334,1.1));const dl=new THREE.DirectionalLight(0xffffff,2);dl.position.set(3,5,4);s.add(dl);
+const fl=new THREE.Mesh(new THREE.CircleGeometry(2,48),new THREE.MeshStandardMaterial({color:0x2c3040}));fl.rotation.x=-Math.PI/2;s.add(fl);
+let rig=null,rot=0;
+const rebuild=()=>{try{const d=JSON.parse($('t').value);if(rig)s.remove(rig.root);rig=buildCharacter(d);s.add(rig.root);$('err').textContent='';}catch(e){$('err').textContent=e.message}};
+const ids=await (await fetch('characters/index.json')).json();
+$('who').innerHTML=ids.map(i=>`<option>${i}</option>`).join('');$('pose').innerHTML=Object.keys(POSES).map(i=>`<option>${i}</option>`).join('');
+const load=async()=>{$('t').value=JSON.stringify(await (await fetch(`characters/${$('who').value}.json`)).json(),null,1);rebuild()};
+$('who').onchange=load;$('t').oninput=rebuild;await load();
+addEventListener('pointermove',e=>{if(e.buttons)rot+=e.movementX*.01});
+const rs=()=>{r.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()};addEventListener('resize',rs);rs();
+r.setAnimationLoop(t=>{if(rig){applyPose(rig,$('pose').value,t/16.7);rig.root.rotation.y=rot+Math.PI/2*0+t/2000}r.render(s,cam)});
+</script></body></html>

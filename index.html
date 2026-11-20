@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><title>Brawl Arena</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+html,body{margin:0;height:100%;overflow:hidden;background:linear-gradient(#2a0f2e,#6a1f2f 60%,#1b1020);color:#fff;font-family:Impact,'Arial Black',system-ui,sans-serif;touch-action:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+.hidden{display:none!important}
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;text-align:center;padding:16px}
+h1{font-size:clamp(36px,8vw,84px);margin:0;letter-spacing:4px;color:#ffd54a;text-shadow:0 4px 0 #8a1d1d,0 0 30px #ff5a1a}
+button{font:inherit;color:#fff;background:#8a1d1d;border:2px solid #ffd54a;border-radius:8px;padding:12px 22px;font-size:20px;cursor:pointer;letter-spacing:1px}
+button:hover,button:focus{background:#b32626;outline:none}
+select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
+.help{font:13px/1.5 system-ui,sans-serif;color:#ddd;max-width:640px;background:#0006;padding:10px 14px;border-radius:8px}
+#select{justify-content:flex-start;padding-top:14px;pointer-events:none}
+#select>*{pointer-events:auto}
+#roster{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:900px;margin-top:auto;padding-bottom:10px}
+.card{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:100px;padding:8px 10px;font-size:15px}
+.card i{width:28px;height:28px;border-radius:50%;border:4px solid}.card small{font:11px system-ui;opacity:.8}
+#hud{position:fixed;left:0;right:0;top:0;padding:10px 14px;pointer-events:none;display:flex;gap:10px;align-items:flex-start}
+.side{flex:1}.bar{height:20px;border:2px solid #fff;background:#300;transform:skewX(-12deg);overflow:hidden}
+.bar>div{height:100%;background:linear-gradient(#ffe45a,#e8791a)}
+#hp0{float:right}#hp1{float:left}
+.nm{font-size:18px;margin:2px 0;text-shadow:0 2px 0 #000}.pips{font-size:16px;color:#ffd54a}
+#hud .side:last-of-type .nm,#hud .side:last-of-type .pips{text-align:right}
+#timer{font-size:40px;width:70px;text-align:center;text-shadow:0 2px 0 #000;color:#ffd54a}
+#banner{position:fixed;left:0;right:0;top:32%;text-align:center;font-size:clamp(40px,10vw,110px);color:#ffd54a;text-shadow:0 5px 0 #8a1d1d,0 0 30px #000;pointer-events:none}
+#banner small{display:block;font-size:.3em;color:#fff}
+#combo{position:fixed;left:0;right:0;top:92px;text-align:center;font-size:30px;color:#7dffb0;text-shadow:0 2px 0 #000;pointer-events:none}
+#endbar{position:fixed;left:0;right:0;bottom:12%;display:flex;gap:12px;justify-content:center}
+#pauseBtn{position:fixed;right:8px;bottom:8px;font-size:14px;padding:6px 10px;opacity:.6}
+#touch{position:fixed;inset:auto 0 0 0;height:46%;pointer-events:none}
+#touch>*{pointer-events:auto;touch-action:none}
+#dpad{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:18px;width:min(36vw,170px);height:min(36vw,170px);border-radius:50%;background:#fff2;border:2px solid #fff6}
+#knob{position:absolute;left:50%;top:50%;width:40%;height:40%;margin:-20% 0 0 -20%;border-radius:50%;background:#fff6}
+#btns{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#btns button{width:min(17vw,74px);height:min(17vw,74px);border-radius:50%;padding:0;font-size:14px;background:#8a1d1d99}
+#btns button.down{background:#ffd54a;color:#000}
+@media (pointer:coarse){#pauseBtn{bottom:auto;top:8px}}
+</style></head><body>
+<canvas id="c"></canvas>
+
+<div id="loading" class="screen">Loading…</div>
+
+<div id="menu" class="screen hidden">
+  <h1>BRAWL ARENA</h1>
+  <button id="btn1p">1 PLAYER vs CPU</button>
+  <button id="btn2p">2 PLAYERS (one keyboard)</button>
+  <button id="btnOnline">ONLINE (2 devices)</button>
+  <label>CPU difficulty <select id="diff"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option></select></label>
+  <div class="help"><b>P1:</b> move WASD · LP F · HP G · LK C · HK V · Block Shift · Run X<br>
+  <b>P2:</b> move arrows · LP U · HP I · LK J · HK K · Block L · Run O (or numpad 4/5/1/2/0/3)<br>
+  <b>Moves:</b> ↓+HP uppercut · ↓+LK sweep · ↓,↘,→ + punch fireball · jump + attack · hold Block to guard (crouch-block stops sweeps)<br>
+  <b>Phone:</b> on-screen pad + buttons (1 Player mode). Esc = pause.</div>
+</div>
+
+<div id="online" class="screen hidden" style="background:#000b">
+  <h1 style="font-size:clamp(28px,6vw,56px)">ONLINE</h1>
+  <button id="hostBtn">HOST A GAME</button>
+  <div>or enter a friend's code</div>
+  <div style="display:flex;gap:8px"><input id="code" maxlength="5" placeholder="CODE" autocapitalize="characters" style="font:inherit;font-size:24px;width:130px;text-align:center;text-transform:uppercase;border-radius:8px;border:2px solid #ffd54a;user-select:text;-webkit-user-select:text"><button id="joinBtn">JOIN</button></div>
+  <div id="onStatus" class="help" style="min-height:1.5em"></div>
+  <button id="onBack" style="font-size:14px">Back</button>
+</div>
+
+<div id="select" class="screen hidden">
+  <h1 style="font-size:clamp(24px,5vw,44px)" id="selTitle">Choose your fighter</h1>
+  <button id="randBtn" style="font-size:14px;padding:6px 12px">🎲 Random</button>
+  <div id="roster"></div>
+</div>
+
+<div id="hud" class="hidden">
+  <div class="side"><div class="nm" id="n0"></div><div class="bar"><div id="hp0"></div></div><div class="pips" id="p0"></div></div>
+  <div id="timer">99</div>
+  <div class="side"><div class="nm" id="n1"></div><div class="bar"><div id="hp1"></div></div><div class="pips" id="p1"></div></div>
+</div>
+<div id="banner" class="hidden"></div><div id="combo"></div>
+<div id="endbar" class="hidden"><button id="rematch">REMATCH</button><button id="menuBtn2">MENU</button></div>
+<button id="pauseBtn" class="hidden">❚❚</button>
+<div id="pause" class="screen hidden" style="background:#000a"><h1>PAUSED</h1><button id="resume">RESUME</button><button id="btnMenu">QUIT TO MENU</button></div>
+
+<div id="touch" class="hidden">
+  <div id="dpad"><div id="knob"></div></div>
+  <div id="btns">
+    <button data-btn="lp">LP</button><button data-btn="hp">HP</button><button data-btn="run">RUN</button>
+    <button data-btn="lk">LK</button><button data-btn="hk">HK</button><button data-btn="bl">BLOCK</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+<script type="module" src="src/game.js"></script>
+<script>
+// pause button visible only while fighting
+new MutationObserver(()=>{document.getElementById('pauseBtn').classList.toggle('hidden',document.getElementById('hud').classList.contains('hidden'))}).observe(document.getElementById('hud'),{attributes:true});
+</script>
+</body></html>
