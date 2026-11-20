@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace } from './model.js?v=3';
-import { loadFaces, canDecrypt } from './faces.js?v=3';
-import { Fighter, MOVES } from './fighter.js?v=3';
-import { makeAI } from './ai.js?v=3';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=3';
-import { Net, packInput, unpackInput } from './net.js?v=3';
-import { buildStage } from './stage.js?v=3';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=4';
+import { loadFaces, canDecrypt } from './faces.js?v=4';
+import { Fighter, MOVES } from './fighter.js?v=4';
+import { makeAI } from './ai.js?v=4';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=4';
+import { Net, packInput, unpackInput } from './net.js?v=4';
+import { buildStage } from './stage.js?v=4';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -250,6 +250,7 @@ function poseUpdate(f) {
   applyPose(f.rig, st === 'win' ? 'win' : f.poseName(), f.u, st === 'attack' ? 0.5 : 0.35, -f.face * 0.4);
   f.rig.root.position.set(f.x, f.y, 0);
   f.rig.root.rotation.y = f.face * (Math.PI / 2 - 0.45); // 3/4 view so faces show to the camera
+  updateFace(f.rig, f.face);
 }
 
 /* ---------- main loop ---------- */
@@ -258,7 +259,7 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (phase === 'menu') {
-    previewRoot.children.forEach((g, i) => { g.rotation.y = Math.sin(now / 900 + i) * 0.8; });
+    previewRoot.children.forEach((g, i) => { g.rotation.y = Math.sin(now / 900 + i) * 0.8; }); preview.forEach((r) => r && updateFace(r, 1));
     frameCamera(0, 0, 3, 2.3);
   } else {
     if (!paused) {
@@ -288,7 +289,7 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-const V = 3; // bump to bust browser caches after updates
+const V = 4; // bump to bust browser caches after updates
 async function boot() {
   await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
   const withFace = defs.filter((d) => d.face).length;

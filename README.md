@@ -43,6 +43,7 @@ A character can wear a real face: `"face": {"src":"faces/<id>.enc","crop":[x,y,w
 - Add a face: put the photo in `_private/photos/`, encrypt with
   `openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -salt -in photo.jpg -out faces/<id>.enc -pass file:<file containing the normalized password>`,
   then add the `face` block (crop = pixel rectangle around the face, roughly 0.9 wide:tall). Best photos: front-facing, well lit, 400px+ face.
+- Photo faces render as a flat 2D head cutout (billboard) with an outline; it always faces the camera and flips (coin-style) when the fighter turns.
 - `bright` lightens dark photos; `match` (0..1) pulls a color-cast photo toward the character's skin tone.
 
 ## Online play

@@ -137,24 +137,33 @@ export function buildCharacter(d) {
   return { root, body, torso, head, neck: neckPivot, arms, elbows, legs, knees, feat, cur: {} };
 }
 
-/* ---- photo faces: a feathered, curved patch textured with a cropped photo, floated just above the head ---- */
-let featherTex;
-function feather() {
-  if (featherTex) return featherTex;
+/* ---- photo faces: a flat 2D head cutout (billboard) that always faces the camera and flips when the fighter turns ---- */
+let ovalTex;
+function oval() {
+  if (ovalTex) return ovalTex;
   const c = document.createElement('canvas'); c.width = c.height = 128;
-  const g = c.getContext('2d'), grd = g.createRadialGradient(64, 64, 20, 64, 64, 62);
-  grd.addColorStop(0, '#fff'); grd.addColorStop(0.5, '#fff'); grd.addColorStop(1, '#000');
-  g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
-  return (featherTex = new THREE.CanvasTexture(c));
+  const g = c.getContext('2d'), gr = g.createRadialGradient(64, 64, 30, 64, 64, 62);
+  gr.addColorStop(0, '#fff'); gr.addColorStop(0.78, '#fff'); gr.addColorStop(1, '#000');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  return (ovalTex = new THREE.CanvasTexture(c));
 }
-/** tex: THREE.Texture of the cropped face. Hides the generated face and wraps the photo over the front of the head. */
+/** tex: cropped face photo. Hides the generated 3D head and puts the photo in its place as a 2D cutout with a cartoon outline. */
 export function applyFace(rig, tex, opts = {}) {
-  rig.feat.visible = false;
+  rig.head.children.forEach((ch) => (ch.visible = false));
   tex.colorSpace = THREE.SRGBColorSpace;
-  const w = opts.width ?? 1.75, ht = opts.height ?? 1.55, y = opts.y ?? -0.05;
-  const geo = new THREE.SphereGeometry(0.272, 28, 28, Math.PI / 2 - w / 2, w, Math.PI / 2 - ht / 2 + y, ht);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, alphaMap: feather(), transparent: true, depthWrite: false, color: new THREE.Color().setScalar(opts.bright ?? 0.95) });
-  const m = new THREE.Mesh(geo, mat); m.scale.set(0.9, 1.05, 0.95); m.renderOrder = 5; m.position.y = 0.0; rig.head.add(m);
+  const H = opts.size ?? 0.66, W = H * (tex.image.width / tex.image.height);
+  const g = new THREE.Group(); g.position.y = opts.y ?? -0.03; rig.head.add(g);
+  const mk = (mat, s, z) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(W * s, H * s), mat); m.position.z = z; m.renderOrder = 5; g.add(m); return m; };
+  mk(new THREE.MeshBasicMaterial({ color: 0x0a0a12, alphaMap: oval(), transparent: true, side: THREE.DoubleSide, depthWrite: false }), 1.07, 0);
+  mk(new THREE.MeshBasicMaterial({ map: tex, alphaMap: oval(), transparent: true, side: THREE.DoubleSide, depthWrite: false, color: new THREE.Color().setScalar(opts.bright ?? 1) }), 1, 0.002);
+  rig.facePlane = g; rig.flip = 1;
+}
+/** Keep the 2D head facing the camera; `dir` = +1/-1. The flip animates through zero width, like a coin turning. */
+export function updateFace(rig, dir) {
+  if (!rig.facePlane) return;
+  rig.flip += (dir - rig.flip) * 0.22;
+  rig.facePlane.rotation.y = -(rig.root.rotation.y + rig.head.rotation.y);
+  rig.facePlane.scale.x = rig.flip;
 }
 
 /* ---- procedural poses. Rotation.x angles: negative = swing forward/up. e = elbow bend (neg = forearm forward), k = knee bend (pos = shin back). ---- */
