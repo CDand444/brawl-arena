@@ -30,7 +30,7 @@ export class Fighter {
   }
 
   reset(x) {
-    Object.assign(this, { x, y: 0, vy: 0, vx: 0, wv: 0, face: this.side === 0 ? 1 : -1, hp: this.maxHp, state: 'idle', t: 0, move: null, airMove: null,
+    Object.assign(this, { x, px: x, py: 0, y: 0, vy: 0, vx: 0, wv: 0, face: this.side === 0 ? 1 : -1, hp: this.maxHp, state: 'idle', t: 0, move: null, airMove: null,
       hitDone: false, comboHits: 0, comboDmg: 0, inv: 0, stun: 0, crouchBlock: false, prev: EMPTY(), hist: [], fbCooldown: 0, u: 0, meter: 0,
       buf: null, bufT: 0, chain: 0, djUsed: false, dj0: 0 });
   }
@@ -82,6 +82,7 @@ export class Fighter {
   }
 
   update(opp, game, inputOverride) {
+    this.px = this.x; this.py = this.y; // previous tick, for smooth rendering between sim steps
     const { inp, pr, ep } = this.poll(inputOverride);
     this.u++;
     if (this.fbCooldown > 0) this.fbCooldown--;

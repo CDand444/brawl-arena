@@ -43,7 +43,7 @@ smooth walk acceleration, air steering + fast-fall (hold down), impact freeze-fr
 - **Ranged special** (P1 `E` / P2 `P`, or down, down-forward, forward + punch): per character via `special.type` in JSON: `fireball` (mid height: duck it), `low` (ground wave: jump it), `fast` (quick, weaker).
 - **Ultimate** (P1 `R` / P2 `;`, or down, down-forward, forward + HK): needs a full blue SUPER bar (fills by hitting and being hit). Fast, unblockable, 30 damage,
   with armor while charging. Name/color from `ultimate` in JSON. On touch screens: SPECIAL and ULT buttons.
-- A floating how-to-fight card shows when a match starts (click to close, `?` button reopens it).
+- Controls live in the pause menu (Esc or the pause button). Online it overlays the running match.
 
 ### Summons
 An `ultimate` can carry `"summon": {"id":"<character id>","chance":0.5,"seconds":10,"power":0.7,"label":"..."}`: when the Ultimate is cast there is that chance a scripted, untouchable
@@ -67,6 +67,10 @@ page address: open the **share link with `#k=...`** in Safari first, then Share 
 If the app still asks for the password, paste the password or the whole share link into the box once; it is remembered after that.
 
 ## Online play
+Menu -> ONLINE shows a **live list of open games** (a lobby inside the browsers, no server to run: whoever opens the screen first hosts the lobby, others take over if they leave).
+Lobbies are private to people with the same group password (a hash of it names the lobby); others share a public lobby. Type your name, press HOST A GAME, friends tap JOIN. The 5-letter code still works.
+After a match: REMATCH, CHANGE FIGHTER (both players go back to character select, still connected) or MENU. Offline, the pause menu has the same options.
+
 Menu → ONLINE. One player picks HOST and sends the 5-letter code; the other enters it and presses JOIN. Host is Player 1 (left).
 Both pick a fighter, the match starts, REMATCH needs both players to press it. Works between phone and desktop.
 - Peer-to-peer (WebRTC via PeerJS). The free public PeerJS broker only introduces the two browsers; no game server to run.
@@ -78,3 +82,7 @@ Both pick a fighter, the match starts, REMATCH needs both players to press it. W
 
 ## Not done yet
 Rollback netcode (smoother at high ping), real animation/rigged models, throws, run meter, gamepads, 2 players on one phone.
+
+## Performance notes
+Rendering is decoupled from the 60 Hz sim (interpolated, time-based smoothing); sparks are pooled; no lights are added/removed at runtime (that recompiles shaders);
+quality drops automatically on sustained low fps (phones start lower). Press F3 for an fps/quality readout.

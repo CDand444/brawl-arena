@@ -12,7 +12,7 @@ const add = (p, geo, mat, x = 0, y = 0, z = 0, ol = 1.06) => {
   if (ol && !mat.transparent && mat.side !== THREE.DoubleSide) { const o = new THREE.Mesh(geo, OUTLINE); o.scale.setScalar(ol); o.castShadow = false; m.add(o); }
   return m;
 };
-const cap = (r, len, seg = 6) => new THREE.CapsuleGeometry(r, len, seg, 14);
+const cap = (r, len, seg = 4) => new THREE.CapsuleGeometry(r, len, seg, 10);
 
 /** Build a posable 3D fighter from a character definition (characters/*.json). Faces +z. */
 export function buildCharacter(d) {
@@ -73,7 +73,7 @@ export function buildCharacter(d) {
   const neckPivot = new THREE.Group(); neckPivot.position.y = 0.88; torso.add(neckPivot);
   add(neckPivot, new THREE.CylinderGeometry(0.075, 0.09, 0.16, 12), skin, 0, 0.02, 0);
   const head = new THREE.Group(); const HS = d.headScale ?? 1.45; head.scale.setScalar(HS); head.position.y = 0.06 + 0.17 * HS; neckPivot.add(head); // big head: reads better in a fighting game and shows photo faces
-  add(head, new THREE.SphereGeometry(0.24, 28, 22), skin).scale.set(0.9, 1.05, 0.95);
+  add(head, new THREE.SphereGeometry(0.24, 22, 16), skin).scale.set(0.9, 1.05, 0.95);
   add(head, new THREE.SphereGeometry(0.17, 20, 16), skin, 0, -0.1, 0.03, 1.05).scale.set(1, 0.95, 1); // jaw
   for (const x of [-1, 1]) add(head, new THREE.SphereGeometry(0.04, 10, 8), skin, x * 0.225, -0.01, 0, 0); // ears
 
@@ -159,9 +159,9 @@ export function applyFace(rig, tex, opts = {}) {
   rig.facePlane = g; rig.flip = 1;
 }
 /** Keep the 2D head facing the camera; `dir` = +1/-1. The flip animates through zero width, like a coin turning. */
-export function updateFace(rig, dir) {
+export function updateFace(rig, dir, dt = 1 / 60) {
   if (!rig.facePlane) return;
-  rig.flip += (dir - rig.flip) * 0.22;
+  rig.flip += (dir - rig.flip) * (1 - Math.pow(0.78, Math.min(dt, 0.05) * 60));
   rig.facePlane.rotation.y = -(rig.root.rotation.y + rig.head.rotation.y);
   rig.facePlane.scale.x = rig.flip;
 }

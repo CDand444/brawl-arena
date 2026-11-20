@@ -45,3 +45,45 @@ export class Net {
 const KEYS = ['l', 'r', 'u', 'd', 'lp', 'hp', 'lk', 'hk', 'bl', 'run', 'sp', 'ult'];
 export const packInput = (i) => KEYS.reduce((n, k, b) => n | (i[k] ? 1 << b : 0), 0);
 export const unpackInput = (n) => { const o = {}; KEYS.forEach((k, b) => (o[k] = (n >> b) & 1)); return o; };
+
+/** Live lobby over PeerJS. Whoever opens the Online screen first becomes the "lobby server" (a well-known peer id for the group);
+ *  everyone else connects to it, registers their open room, and receives the live list. If the server tab closes, a client takes over. */
+export class Lobby {
+  constructor(id, onRooms) { this.id = id; this.onRooms = onRooms; this.peer = null; this.role = null; this.conns = new Set(); this.rooms = new Map(); this.up = null; this.room = null; this.dead = false; }
+  start() { this.dead = false; this.tryServer(); }
+  tryServer() {
+    if (this.dead) return;
+    let p; try { p = new Peer(this.id); } catch (e) { return; }
+    this.peer = p;
+    p.on('open', () => { this.role = 'server'; this.broadcast(); });
+    p.on('disconnected', () => { try { p.reconnect(); } catch (e) {} });
+    p.on('connection', (c) => {
+      c.on('open', () => { this.conns.add(c); c.send({ t: 'rooms', rooms: this.list() }); });
+      c.on('data', (m) => { if (m.t === 'room') this.rooms.set(c.peer, m.room); else if (m.t === 'noroom') this.rooms.delete(c.peer); this.broadcast(); });
+      c.on('close', () => { this.conns.delete(c); this.rooms.delete(c.peer); this.broadcast(); });
+    });
+    p.on('error', (e) => { if (e.type === 'unavailable-id') { try { p.destroy(); } catch (x) {} this.tryClient(); } else this.retry(); });
+  }
+  tryClient() {
+    if (this.dead) return;
+    let p; try { p = new Peer(); } catch (e) { return; }
+    this.peer = p;
+    p.on('open', () => {
+      const c = p.connect(this.id, { reliable: true }); this.up = c;
+      c.on('open', () => { this.role = 'client'; if (this.room) c.send({ t: 'room', room: this.room }); });
+      c.on('data', (m) => { if (m.t === 'rooms') this.onRooms(m.rooms); });
+      c.on('close', () => { this.up = null; this.retry(); });
+    });
+    p.on('error', () => this.retry());
+  }
+  retry() { if (this.dead) return; this.stopPeer(); setTimeout(() => this.tryServer(), 600 + Math.random() * 1500); }
+  list() { const r = [...this.rooms.values()]; if (this.room) r.push(this.room); return r; }
+  broadcast() { const l = this.list(); this.onRooms(l); for (const c of this.conns) if (c.open) c.send({ t: 'rooms', rooms: l }); }
+  setRoom(room) {
+    this.room = room;
+    if (this.role === 'server') this.broadcast();
+    else if (this.up && this.up.open) this.up.send(room ? { t: 'room', room } : { t: 'noroom' });
+  }
+  stopPeer() { try { this.peer && this.peer.destroy(); } catch (e) {} this.peer = null; this.role = null; this.up = null; this.conns.clear(); this.rooms.clear(); }
+  stop() { this.dead = true; this.stopPeer(); this.onRooms([]); }
+}

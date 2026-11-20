@@ -27,9 +27,10 @@ const floorPlane = (G, tex, rough = 0.6, metal = 0.1) => {
   const f = new THREE.Mesh(new THREE.PlaneGeometry(96, 20), new THREE.MeshStandardMaterial({ map: tex, roughness: rough, metalness: metal }));
   f.rotation.x = -Math.PI / 2; f.receiveShadow = true; G.add(f); return f;
 };
+let shadowSize = 2048; const shadowLights = [];
 const keyLight = (G, color, intensity, x, y, z) => {
-  const l = new THREE.DirectionalLight(color, intensity); l.position.set(x, y, z); l.castShadow = true;
-  Object.assign(l.shadow.camera, { left: -10, right: 10, top: 6, bottom: -3 }); l.shadow.mapSize.set(2048, 2048); l.shadow.bias = -0.0005; G.add(l); return l;
+  const l = new THREE.DirectionalLight(color, intensity); l.position.set(x, y, z); l.castShadow = shadowSize > 0;
+  Object.assign(l.shadow.camera, { left: -10, right: 10, top: 6, bottom: -3 }); l.shadow.mapSize.set(shadowSize || 1024, shadowSize || 1024); l.shadow.bias = -0.0005; G.add(l); shadowLights.push(l); return l;
 };
 const dirLight = (G, color, intensity, x, y, z) => { const l = new THREE.DirectionalLight(color, intensity); l.position.set(x, y, z); G.add(l); return l; };
 
@@ -59,11 +60,13 @@ function temple(G, scene, env) {
     const top = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.35, 1.5), dark); top.position.set(i * 4, h, z); G.add(top);
     if (Math.abs(i) % 2 === 1 && Math.abs(i) <= 3) {
       const f = glowSprite(0xff8a2a, 1.6, 2.2, i * 4, 2.6, z + 0.9); G.add(f);
-      const l = new THREE.PointLight(0xff7a2a, 14, 11, 1.6); l.position.set(i * 4, 2.8, z + 1.4); G.add(l); flames.push({ f, l, ph: i });
+      let l = null; // only the two nearest torches get a real light (every extra light slows every pixel)
+      if (Math.abs(i) === 1) { l = new THREE.PointLight(0xff7a2a, 14, 11, 1.6); l.position.set(i * 4, 2.8, z + 1.4); G.add(l); }
+      flames.push({ f, l, ph: i });
     }
   }
   const wall = new THREE.Mesh(new THREE.PlaneGeometry(120, 12), new THREE.MeshBasicMaterial({ color: 0x1a0d24 })); wall.position.set(0, 6, -26); G.add(wall);
-  return (t) => flames.forEach(({ f, l, ph }) => { const fl = 0.85 + Math.sin(t * 11 + ph * 3) * 0.1 + Math.sin(t * 23 + ph) * 0.08; l.intensity = 14 * fl; f.scale.set(1.6 * fl, 2.2 * fl, 1); });
+  return (t) => flames.forEach(({ f, l, ph }) => { const fl = 0.85 + Math.sin(t * 11 + ph * 3) * 0.1 + Math.sin(t * 23 + ph) * 0.08; if (l) l.intensity = 14 * fl; f.scale.set(1.6 * fl, 2.2 * fl, 1); });
 }
 
 function arch(G, scene, env) {
@@ -162,21 +165,31 @@ export function buildStage(scene, renderer) {
   const env = { embers: (color, amount) => { embers.visible = amount > 0; embers.material.color.setHex(color); embers.material.opacity = amount; }, rain: (on) => { rain.visible = on; } };
 
   let group = null, tick = null, current = null;
-  const sparks = [];
+  // spark pool: sprites and materials are created once and reused (creating/disposing per hit caused garbage-collection hitches)
+  const POOL = 220, pool = [];
+  for (let i = 0; i < POOL; i++) {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false })); sp.visible = false; scene.add(sp);
+    pool.push({ s: sp, vx: 0, vy: 0, life: 0, max: 0.6 });
+  }
   const api = {
     shake: 0,
     get map() { return current; },
+    setShadows(n) {
+      shadowSize = n;
+      shadowLights.forEach((l) => { l.castShadow = n > 0; if (n > 0) { l.shadow.mapSize.set(n, n); if (l.shadow.map) { l.shadow.map.dispose(); l.shadow.map = null; } } });
+    },
     setMap(id) {
       if (!BUILDERS[id] || id === current) return;
       if (group) { scene.remove(group); group.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map !== glowTex) { o.material.map?.dispose?.(); o.material.dispose?.(); } }); }
-      current = id; group = new THREE.Group(); scene.add(group); env.rain(false); tick = BUILDERS[id](group, scene, env) || null;
+      current = id; group = new THREE.Group(); scene.add(group); env.rain(false); shadowLights.length = 0; tick = BUILDERS[id](group, scene, env) || null;
     },
     spark(x, y, n = 8, color = 0xffd070, power = 1) {
-      for (let i = 0; i < n; i++) {
-        const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
-        const sz = (0.15 + Math.random() * 0.3) * power; s.scale.set(sz, sz, 1); s.position.set(x, y, 0.3); scene.add(s);
+      let made = 0;
+      for (let i = 0; i < pool.length && made < n; i++) {
+        const k = pool[i]; if (k.life > 0) continue; made++;
+        const sz = (0.15 + Math.random() * 0.3) * power; k.s.scale.set(sz, sz, 1); k.s.position.set(x, y, 0.3); k.s.material.color.setHex(color); k.s.material.opacity = 1; k.s.visible = true;
         const a = Math.random() * Math.PI * 2, sp = (1.5 + Math.random() * 3.5) * power;
-        sparks.push({ s, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 1, life: 0.3 + Math.random() * 0.3, max: 0.6 });
+        k.vx = Math.cos(a) * sp; k.vy = Math.sin(a) * sp + 1; k.life = 0.3 + Math.random() * 0.3; k.max = 0.6;
       }
     },
     glow(color, size = 1.6) {
@@ -188,10 +201,10 @@ export function buildStage(scene, renderer) {
       if (tick) tick(t, dt);
       if (embers.visible) { const p = eg.attributes.position; for (let i = 0; i < N; i++) { let y = p.getY(i) + vel[i] * dt; if (y > 9) y = 0; p.setY(i, y); p.setX(i, p.getX(i) + Math.sin(t + i) * dt * 0.3); } p.needsUpdate = true; }
       if (rain.visible) { const p = rg.attributes.position; for (let i = 0; i < RN; i++) { let y = p.getY(i) - 14 * dt; if (y < 0) y = 14; p.setY(i, y); } p.needsUpdate = true; }
-      for (let i = sparks.length - 1; i >= 0; i--) {
-        const k = sparks[i]; k.life -= dt; k.vy -= 9 * dt; k.s.position.x += k.vx * dt; k.s.position.y += k.vy * dt;
-        k.s.material.opacity = Math.max(0, k.life / k.max);
-        if (k.life <= 0) { scene.remove(k.s); k.s.material.dispose(); sparks.splice(i, 1); }
+      for (let i = 0; i < pool.length; i++) {
+        const k = pool[i]; if (k.life <= 0) continue;
+        k.life -= dt; k.vy -= 9 * dt; k.s.position.x += k.vx * dt; k.s.position.y += k.vy * dt;
+        if (k.life <= 0) k.s.visible = false; else k.s.material.opacity = Math.min(1, k.life / k.max);
       }
       api.shake *= 0.86;
     },

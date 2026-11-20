@@ -1,17 +1,18 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=13';
-import { loadFaces, canDecrypt } from './faces.js?v=13';
-import { Fighter, MOVES } from './fighter.js?v=13';
-import { makeAI } from './ai.js?v=13';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=13';
-import { Net, packInput, unpackInput } from './net.js?v=13';
-import { buildStage, MAPS } from './stage.js?v=13';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=16';
+import { loadFaces, canDecrypt, normalize } from './faces.js?v=16';
+import { Fighter, MOVES } from './fighter.js?v=16';
+import { makeAI } from './ai.js?v=16';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=16';
+import { Net, Lobby, packInput, unpackInput } from './net.js?v=16';
+import { buildStage, MAPS } from './stage.js?v=16';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
 
 /* ---------- three.js stage ---------- */
-const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, alpha: true });
+const isCoarse = matchMedia('(pointer:coarse)').matches;
+const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: !isCoarse, alpha: true, powerPreference: 'high-performance' });
 const scene = new THREE.Scene();
 const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
 const stage = buildStage(scene, renderer);
@@ -19,17 +20,17 @@ let mapId = 'temple'; try { mapId = localStorage.getItem('brawl-map') || 'temple
 if (mapId !== 'random' && !MAPS.some((m) => m.id === mapId)) mapId = 'temple';
 stage.setMap(mapId === 'random' ? 'temple' : mapId);
 const resolveMap = () => (mapId === 'random' ? MAPS[(Math.random() * MAPS.length) | 0].id : mapId);
-function resize() {
-  const w = innerWidth, h = innerHeight;
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(w, h, false);
-  cam.aspect = w / h; cam.updateProjectionMatrix();
-}
+// quality 3 (best) .. 0 (fastest). Drops automatically if the frame rate sags; phones start lower.
+let quality = isCoarse ? 2 : 3;
+const DPR = [1, 1, 1.5, 2];
+function applyQuality() { renderer.setPixelRatio(Math.min(devicePixelRatio, DPR[quality])); renderer.setSize(innerWidth, innerHeight, false); stage.setShadows(quality >= 3 ? 2048 : quality >= 1 ? 1024 : 0); }
+function resize() { applyQuality(); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
 function frameCamera(cx, spread, k = 1, minHalf = 3.4) {
   const halfW = Math.max(minHalf, spread / 2 + 2.2), t = Math.tan((cam.fov * Math.PI) / 360);
   const z = Math.max(halfW / (t * cam.aspect), (minHalf < 3 ? 1.35 : 1.8) / t);
-  cam.position.x += (cx - cam.position.x) * 0.1 * k; cam.position.y = 1.5; cam.position.z += (z - cam.position.z) * 0.1 * k;
+  const s = 1 - Math.pow(0.9, k); cam.position.x += (cx - cam.position.x) * s; cam.position.y = 1.5; cam.position.z += (z - cam.position.z) * s;
   cam.lookAt(cam.position.x, 1.15, 0);
 }
 cam.position.set(0, 1.5, 12);
@@ -92,16 +93,18 @@ function openSelect() {
   step = 0; picks = []; $('selTitle').textContent = mode === 'p2' ? 'Player 1: choose your fighter' : 'Choose your fighter';
   $('randBtn').classList.toggle('hidden', false);
   buildMapChips(); $('maps').classList.toggle('hidden', mode === 'online' && localSlot === 1);
-  setPreview(0, null); setPreview(1, null); previewRoot.visible = true; fighters.forEach((f) => scene.remove(f.rig.root)); fighters = []; phase = 'menu';
+  ['banner', 'fsBtn', 'ad', 'pause', 'rotate'].forEach((i) => show(i, false)); paused = false; $('combo').textContent = '';
+  setPreview(0, null); setPreview(1, null); previewRoot.visible = true; clearFighters(); phase = 'menu';
 }
 $('btn1p').onclick = () => { mode = 'ai'; openSelect(); };
 $('btn2p').onclick = () => { mode = '2p'; openSelect(); };
 $('randBtn').onclick = () => choose(defs[(Math.random() * defs.length) | 0]);
 $('diff').onchange = (e) => (diff = +e.target.value);
 function goMenu() {
+  stopLobby();
   if (mode === 'online') { net.close(); net = new Net(); }
   mode = 'ai'; phase = 'menu'; clearFighters(); previewRoot.visible = true; setPreview(0, null); setPreview(1, null); paused = false;
-  ['select', 'hud', 'touch', 'endbar', 'pause', 'online', 'banner', 'tips', 'tipsBtn', 'fsBtn', 'rotate', 'ad'].forEach((i) => show(i, false)); show('menu');
+  ['select', 'hud', 'touch', 'endbar', 'pause', 'online', 'banner', 'fsBtn', 'rotate', 'ad'].forEach((i) => show(i, false)); show('menu');
 }
 $('btnMenu').onclick = $('menuBtn2').onclick = goMenu;
 $('rematch').onclick = () => {
@@ -109,19 +112,52 @@ $('rematch').onclick = () => {
   myRematch = true; net.send({ t: 'rematch' }); $('rematch').textContent = 'WAITING…'; tryRematch();
 };
 
+function changeFighter() {
+  if (mode === 'online') { net.send({ t: 'reselect' }); myPick = theirPick = null; myRematch = theirRematch = false; $('rematch').textContent = 'REMATCH'; }
+  openSelect();
+}
+$('changeBtn').onclick = changeFighter;
+$('pRematch').onclick = () => { paused = false; show('pause', false); startMatch(); };
+$('pChange').onclick = () => { paused = false; show('pause', false); changeFighter(); };
+
 /* ---------- online (lockstep: both browsers run the same deterministic sim, only inputs are exchanged) ---------- */
 const DELAY = 4; // input delay in ticks (~67ms); higher = smoother on bad connections
 let net = new Net(), localSlot = 0, myPick = null, theirPick = null, myRematch = false, theirRematch = false;
 let simTick = 0, localBuf = {}, remoteBuf = {};
 const sampleLocal = combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput());
 const setStatus = (t) => ($('onStatus').textContent = t);
-$('btnOnline').onclick = () => { show('menu', false); show('online'); setStatus(''); };
-$('onBack').onclick = () => { net.close(); net = new Net(); show('online', false); show('menu'); };
+let lobby = null, lobbyTok = 0, hostingCode = null;
+async function groupId() { // lobbies are private to everyone who has the same password; others share a public lobby
+  let pw = ''; try { pw = localStorage.getItem('brawl-pw') || ''; } catch (e) {}
+  if (!pw || !(globalThis.crypto && crypto.subtle)) return 'public';
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('lobby:' + normalize(pw)));
+  return [...new Uint8Array(d)].slice(0, 8).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+function renderRooms(list) {
+  const box = $('rooms'); box.textContent = '';
+  const rooms = (list || []).filter((r) => r && r.code && r.code !== hostingCode);
+  if (!rooms.length) { box.textContent = 'No open games yet. Host one and your friends will see it here.'; return; }
+  rooms.forEach((r) => { const b = document.createElement('button'); b.textContent = `${String(r.name || 'Player').slice(0, 14)}'s game   ▶ JOIN`; b.onclick = () => joinCode(r.code); box.append(b); });
+}
+async function startLobby() {
+  stopLobby(); const tok = ++lobbyTok; $('rooms').textContent = 'Looking for games…';
+  const gid = await groupId(); if (tok !== lobbyTok) return;
+  lobby = new Lobby('brawl-lobby-' + gid, renderRooms); lobby.start();
+}
+function stopLobby() { lobbyTok++; if (lobby) { lobby.stop(); lobby = null; } hostingCode = null; }
+$('btnOnline').onclick = () => {
+  show('menu', false); show('online'); setStatus(''); show('hostBtn'); show('cancelHost', false);
+  try { $('pname').value = localStorage.getItem('brawl-name') || ''; } catch (e) {}
+  startLobby();
+};
+$('onBack').onclick = () => { stopLobby(); net.close(); net = new Net(); show('online', false); show('menu'); };
+$('cancelHost').onclick = () => { net.close(); net = new Net(); hostingCode = null; if (lobby) lobby.setRoom(null); show('cancelHost', false); show('hostBtn'); setStatus(''); };
 function wireNet() {
   net.onmsg = (m) => {
     if (m.t === 'in') remoteBuf[m.k] = unpackInput(m.v);
     else if (m.t === 'pick') { theirPick = defs.find((d) => d.id === m.id) || null; if (m.map && localSlot === 1) stage.setMap(m.map); tryStartOnline(); }
     else if (m.t === 'rematch') { theirRematch = true; tryRematch(); }
+    else if (m.t === 'reselect') { myPick = theirPick = null; myRematch = theirRematch = false; $('rematch').textContent = 'REMATCH'; openSelect(); toast('Your opponent is picking a new fighter'); }
   };
   net.onclose = () => {
     if (mode !== 'online') return;
@@ -129,21 +165,25 @@ function wireNet() {
   };
 }
 function beginOnline(slot) {
+  stopLobby();
   mode = 'online'; localSlot = slot; myPick = theirPick = null; myRematch = theirRematch = false; wireNet();
   show('online', false); openSelect(); mode = 'online'; // openSelect resets title; keep mode
   $('selTitle').textContent = `Choose your fighter (you are ${slot ? 'Player 2, right' : 'Player 1, left'})`;
 }
 $('hostBtn').onclick = async () => {
-  net.close(); net = new Net(); mode = 'ai'; setStatus('Connecting…');
-  try { await net.host((c) => setStatus(`Your code: ${c}  — send it to your friend and wait…`)); beginOnline(0); }
-  catch (e) { setStatus('Could not start: ' + (e.message || e)); }
+  const name = ($('pname').value.trim() || 'Player').slice(0, 14); try { localStorage.setItem('brawl-name', name); } catch (e) {}
+  net.close(); net = new Net(); mode = 'ai'; setStatus('Opening your game…'); show('hostBtn', false); show('cancelHost');
+  try {
+    await net.host((c) => { hostingCode = c; if (lobby) lobby.setRoom({ code: c, name }); setStatus(`Your game is open as "${name}". Waiting for a challenger… (backup code: ${c})`); });
+    if (lobby) lobby.setRoom(null); beginOnline(0);
+  } catch (e) { show('hostBtn'); show('cancelHost', false); hostingCode = null; if (lobby) lobby.setRoom(null); setStatus('Could not start: ' + (e.message || e)); }
 };
-$('joinBtn').onclick = async () => {
-  const code = $('code').value; if (code.trim().length < 4) return setStatus('Enter the code from your friend.');
+async function joinCode(code) {
   net.close(); net = new Net(); mode = 'ai'; setStatus('Joining…');
   try { await net.join(code); beginOnline(1); }
   catch (e) { setStatus(e.message || 'Could not join.'); }
-};
+}
+$('joinBtn').onclick = () => { const code = $('code').value; if (code.trim().length < 4) return setStatus('Enter the code from your friend.'); joinCode(code); };
 function tryStartOnline() {
   if (!(myPick && theirPick)) return;
   picks = localSlot === 0 ? [myPick, theirPick] : [theirPick, myPick]; startMatch();
@@ -156,7 +196,7 @@ const BOUNDS = 5.2, game = { bounds: BOUNDS };
 const coarse = matchMedia('(pointer:coarse)').matches;
 setupTouch();
 
-function clearFighters() { clearHelpers(); fighters.forEach((f) => scene.remove(f.rig.root)); fighters = []; projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = []; }
+function clearFighters() { clearHelpers(); fighters.forEach((f) => { scene.remove(f.rig.root); if (f.helperRig) scene.remove(f.helperRig.root); }); fighters = []; projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = []; }
 
 function startMatch() {
   show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters(); rngSeed = 0x9e3779b9; if (mode !== 'online') stage.setMap(resolveMap());
@@ -175,17 +215,14 @@ function startMatch() {
   $('n0').textContent = picks[0].name; $('n1').textContent = mode === 'ai' ? picks[1].name + ' (CPU)' : picks[1].name;
   wins = [0, 0]; round = 1; flawless = [true, true];
   show('hud'); show('touch', coarse && mode !== 'p2'); show('rematch'); $('rematch').textContent = 'REMATCH'; paused = false; show('pause', false);
-  scheduleAds(); newRound(); showTips(true); show('tipsBtn'); show('fsBtn'); maybeRotateHint();
+  prewarmHelpers(); scheduleAds(); newRound(); show('fsBtn'); maybeRotateHint();
 }
 function tipsHtml() {
   const k = (a, b) => `<b>${a}</b> ${b}`;
-  if (coarse) return `<h4>HOW TO FIGHT <i>(tap to close)</i></h4>Pad (left): move, up = jump (tap up again in the air = double jump), down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('SPECIAL', 'ranged shot')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
+  if (coarse) return `<h4>CONTROLS</h4>Pad (left): move, up = jump (tap up again in the air = double jump), down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('SPECIAL', 'ranged shot')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
   const p2 = mode === '2p' ? `<br><b>P2:</b> arrows move · U/I punch · J/K kick · L block · O run · <b>P</b> special · <b>;</b> ultimate` : '';
-  return `<h4>HOW TO FIGHT <i>(click to close)</i></h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = pause.</small>`;
+  return `<h4>CONTROLS</h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = this menu.</small>`;
 }
-function showTips(on = true) { $('tips').innerHTML = tipsHtml(); show('tips', on); }
-$('tips').onclick = () => show('tips', false);
-$('tipsBtn').onclick = () => showTips($('tips').classList.contains('hidden'));
 
 function newRound() {
   hitstop = 0; clearHelpers();
@@ -218,7 +255,16 @@ function ghostify(rig) {
   rig.root.traverse((o) => { if (o.isMesh && o.material && o.material.side !== THREE.BackSide) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.8; } });
   const glow = stage.glow(0x9ad8ff, 2.6); glow.position.y = 0.15; rig.root.add(glow);
 }
-function removeHelper(h) { stage.spark(h.f.x, 1, 14, 0x9ad8ff, 0.9); scene.remove(h.f.rig.root); }
+function removeHelper(h) { stage.spark(h.f.x, 1, 14, 0x9ad8ff, 0.9); if (h.owner.helperRig === h.f.rig) h.f.rig.root.position.set(100, 0, 0); else scene.remove(h.f.rig.root); }
+// Build and compile summon rigs before the fight so nothing heavy happens mid-match (a rig build was a visible hitch). They wait off-screen.
+function prewarmHelpers() {
+  fighters.forEach((f) => {
+    const cfg = f.def.ultimate?.summon, def = cfg && defs.find((d) => d.id === cfg.id); if (!def) return;
+    const rig = makeRig(def); ghostify(rig); rig.root.position.set(100, 0, 0); scene.add(rig.root); f.helperRig = rig;
+    if (faceTex[def.id]) renderer.initTexture(faceTex[def.id]);
+  });
+  renderer.compile(scene, cam);
+}
 function clearHelpers() { helpers.forEach(removeHelper); helpers = []; }
 function updateHelpers() {
   for (const h of helpers) { h.f.update(fighters[1 - h.owner.side], game); h.life--; }
@@ -229,9 +275,9 @@ function trySummon(f) { // returns the helper's label if she showed up
   if (game.rand() >= (cfg.chance ?? 0.5)) return null; // always draw one number so both machines stay in step
   const def = defs.find((d) => d.id === cfg.id); if (!def) return null;
   helpers = helpers.filter((h) => { if (h.owner === f) { removeHelper(h); return false; } return true; });
-  const hf = new Fighter(def, makeRig(def), f.side, null);
+  let rig = f.helperRig; if (!rig) { rig = makeRig(def); ghostify(rig); scene.add(rig.root); }
+  const hf = new Fighter(def, rig, f.side, null);
   hf.getInput = makeHelperInput(hf, f); hf.power = cfg.power ?? 0.7; hf.inv = 999999; hf.x = f.x - f.face * 0.9; hf.face = f.face;
-  ghostify(hf.rig); scene.add(hf.rig.root);
   const label = cfg.label || def.name; helpers.push({ f: hf, owner: f, life: Math.round((cfg.seconds ?? 10) * 60), label });
   stage.spark(hf.x, 1, 24, 0x9ad8ff, 1.2);
   return label.toUpperCase();
@@ -242,7 +288,7 @@ game.spawnProjectile = (f, kind = 'fb') => {
   const ult = kind === 'ult', sp = ult ? { py: 1.1, speed: 0.26, dmg: MOVES.ult.dmg, size: 0.7 } : (SPECIALS[f.def.special?.type] || SPECIALS.fireball);
   const color = css(ult ? (f.def.ultimate?.color ?? f.def.special?.color ?? '#ffffff') : (f.def.special?.color ?? '#ff7a1a'));
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(sp.size, 16, 12), new THREE.MeshBasicMaterial({ color }));
-  mesh.add(new THREE.PointLight(color, ult ? 10 : 4, ult ? 12 : 6)); mesh.add(stage.glow(color, ult ? 6 : 2.2));
+  mesh.add(stage.glow(color, ult ? 7 : 2.6)); // no PointLight here: adding/removing a light recompiles every shader (stutter)
   if (ult) mesh.scale.set(1.8, 1.2, 1);
   mesh.position.set(f.x + f.face * 0.8, sp.py, 0); scene.add(mesh);
   projectiles.push({ owner: f, mesh, x: f.x + f.face * 0.8, dir: f.face, dmg: sp.dmg, speed: sp.speed, py: sp.py, hh: ult ? 1.0 : 0.22, low: !!sp.low, unblockable: ult, color: ult ? 0xffffff : 0xffb060, ult });
@@ -273,7 +319,7 @@ game.tryHit = (att, def, m) => {
 
 function step60() {
   if (phase === 'intro') {
-    pt++; fighters.forEach((f) => poseUpdate(f));
+    pt++;
     if (pt === 60) banner('FIGHT!'); if (pt === 100) { banner(''); phase = 'fight'; }
     return;
   }
@@ -300,11 +346,10 @@ function step60() {
     if (Math.abs(p.x) > 12) p.dead = true;
   }
   projectiles = projectiles.filter((p) => { if (p.dead) scene.remove(p.mesh); return !p.dead; });
-  fighters.forEach(poseUpdate); helpers.forEach((h) => poseUpdate(h.f));
 
   // combo + HUD
   const hits = Math.max(a.comboHits, b.comboHits);
-  $('combo').textContent = hits >= 2 ? `${hits} HIT COMBO` : '';
+  setT('combo', hits >= 2 ? `${hits} HIT COMBO` : '');
 
   if (phase === 'fight') {
     if (a.hp < a.maxHp) flawless[0] = false; if (b.hp < b.maxHp) flawless[1] = false;
@@ -330,19 +375,27 @@ function endRound(w, timeUp) {
   else banner(w < 0 ? 'DRAW' : timeUp ? 'TIME UP' : 'K.O.', w >= 0 ? name + ' takes the round' : '');
   sfx(90, 0.5, 'sawtooth', 0.1);
 }
-function poseUpdate(f) {
-  const st = f.state;
-  applyPose(f.rig, st === 'win' ? 'win' : f.poseName(), f.u, st === 'attack' ? 0.5 : 0.35, -f.face * 0.4);
-  f.rig.root.position.set(f.x, f.y, 0);
+// Rendering is decoupled from the 60 Hz sim: positions are interpolated between sim ticks and pose smoothing is time-based,
+// so 90/120/144 Hz screens look smooth instead of stepping.
+function poseUpdate(f, alpha, dt) {
+  const st = f.state, k = st === 'attack' ? 0.5 : 0.35, kk = 1 - Math.pow(1 - k, Math.min(dt, 0.05) * 60);
+  applyPose(f.rig, st === 'win' ? 'win' : f.poseName(), f.u + alpha, kk, -f.face * 0.4);
+  f.rig.root.position.set(f.px + (f.x - f.px) * alpha, f.py + (f.y - f.py) * alpha, 0);
   f.rig.root.rotation.y = f.face * (Math.PI / 2 - 0.45); // 3/4 view so faces show to the camera
-  updateFace(f.rig, f.face);
+  updateFace(f.rig, f.face, dt);
 }
+const cache = {};
+const setT = (id, v) => { if (cache[id] !== v) { cache[id] = v; $(id).textContent = v; } };
+const setW = (id, v) => { v = Math.round(v * 10) / 10 + '%'; if (cache[id] !== v) { cache[id] = v; $(id).style.width = v; } };
 
 /* ---------- main loop ---------- */
-let last = performance.now(), acc = 0;
+let last = performance.now(), acc = 0, ema = 1 / 60, lastQ = performance.now(), showFps = false, lastFps = 0;
 function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
+  ema += (dt - ema) * 0.04;
+  if ((phase === 'fight' || phase === 'intro') && now - lastQ > 3000 && ema > 1 / 40 && quality > 0) { quality--; lastQ = now; applyQuality(); } // sustained <40 fps: lower the load
+  if (showFps && now - lastFps > 400) { lastFps = now; $('fps').textContent = `${Math.round(1 / ema)} fps · quality ${quality}`; }
   if (phase === 'menu') {
     previewRoot.children.forEach((g, i) => { g.rotation.y = Math.sin(now / 900 + i) * 0.8; }); preview.forEach((r) => r && updateFace(r, 1));
     frameCamera(0, 0, 3, 2.3);
@@ -360,12 +413,13 @@ function loop(now) {
     }
     if (fighters.length) {
       const [a, b] = fighters;
-      frameCamera((a.x + b.x) / 2, Math.abs(a.x - b.x));
-      $('hp0').style.width = Math.max(0, (a.hp / a.maxHp) * 100) + '%';
-      $('hp1').style.width = Math.max(0, (b.hp / b.maxHp) * 100) + '%';
-      [a, b].forEach((f, i) => { $('m' + i).style.width = Math.min(100, f.meter) + '%'; $('m' + i).parentElement.classList.toggle('full', f.meter >= 100); });
-      $('backup').textContent = helpers.map((h) => `${h.label} · ${Math.ceil(h.life / 60)}s`).join('   '); $('backup').classList.toggle('hidden', !helpers.length);
-      $('timer').textContent = Math.max(0, Math.ceil(timer / 60));
+      const alpha = paused || hitstop > 0 ? 1 : Math.min(1, acc * 60);
+      fighters.forEach((f) => poseUpdate(f, alpha, dt)); helpers.forEach((h) => poseUpdate(h.f, alpha, dt));
+      frameCamera((a.x + b.x) / 2, Math.abs(a.x - b.x), dt * 60);
+      setW('hp0', Math.max(0, (a.hp / a.maxHp) * 100)); setW('hp1', Math.max(0, (b.hp / b.maxHp) * 100));
+      [a, b].forEach((f, i) => { setW('m' + i, Math.min(100, f.meter)); const full = f.meter >= 100; if (cache['full' + i] !== full) { cache['full' + i] = full; $('m' + i).parentElement.classList.toggle('full', full); } });
+      const bk = helpers.map((h) => `${h.label} · ${Math.ceil(h.life / 60)}s`).join('   '); setT('backup', bk); if (cache.bkv !== !!bk) { cache.bkv = !!bk; $('backup').classList.toggle('hidden', !bk); }
+      setT('timer', String(Math.max(0, Math.ceil(timer / 60))));
     }
   }
   if (phase === 'fight' && !paused && !adOpen() && now > nextAdAt) showAd();
@@ -374,11 +428,21 @@ function loop(now) {
   const sh = stage.shake * 0.14, ox = (Math.random() - 0.5) * sh, oy = (Math.random() - 0.5) * sh;
   cam.position.x += ox; cam.position.y += oy; renderer.render(scene, cam); cam.position.x -= ox; cam.position.y -= oy;
 }
-addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online' && ['fight', 'intro', 'end'].includes(phase)) { paused = !paused; show('pause', paused); } });
-$('resume').onclick = () => { paused = false; show('pause', false); };
-$('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
+const openPause = () => {
+  if (!['fight', 'intro', 'end', 'over'].includes(phase)) return;
+  const online = mode === 'online'; if (!online) paused = true;
+  $('pauseTips').innerHTML = tipsHtml() + (online ? '<br><small>Online: the match keeps running while this menu is open.</small>' : '');
+  show('pRematch', !online); show('pChange', !online); $('btnMenu').textContent = 'QUIT TO MENU'; show('pause');
+};
+const closePause = () => { paused = false; show('pause', false); };
+addEventListener('keydown', (e) => {
+  if (e.code === 'F3') { e.preventDefault(); showFps = !showFps; show('fps', showFps); }
+  if (e.code === 'Escape') { if (!$('pause').classList.contains('hidden')) closePause(); else openPause(); }
+});
+$('resume').onclick = closePause;
+$('pauseBtn').onclick = openPause;
 
-const V = 13;
+const V = 16;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [
