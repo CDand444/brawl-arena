@@ -39,6 +39,12 @@ extras[nosering|necklace|choker|glasses|watch], stats{speed,power,health ~0.85-1
 Double jump (tap jump again in the air), 7-tick input buffer, chain cancels (a connecting light attack can cancel into a different normal or special, max 3),
 smooth walk acceleration, air steering + fast-fall (hold down), impact freeze-frames (hitstop), and attacker pushback when the opponent is cornered.
 
+## Arena, props and health
+Arena is wide (bounds +/-9) with glowing edge posts; every fighter has double health (200 x the character's health stat); rounds last 120 s.
+**Props** (rebuilt each round, deterministic via the seeded RNG): crates (smash them, often drop an item) and explosive barrels (blast = 24 damage + knockdown to anyone close, chain-reacts).
+They are solid: walk around or jump over. **Throwables** (brick 16, bottle 12 and shatters, bowling ball 20 + knockdown): `Q`/`/`/GRAB picks up the item at your feet or throws the one you hold; getting hit makes you drop it.
+Low shots hit crates, high ones fly over. The CPU grabs and throws too.
+
 ## Special moves
 - **Ranged special** (P1 `E` / P2 `P`, or down, down-forward, forward + punch): per character via `special.type` in JSON: `fireball` (mid height: duck it), `low` (ground wave: jump it), `fast` (quick, weaker).
 - **Ultimate** (P1 `R` / P2 `;`, or down, down-forward, forward + HK): needs a full blue SUPER bar (fills by hitting and being hit). Fast, unblockable, 30 damage,
@@ -92,5 +98,5 @@ Rendering is decoupled from the 60 Hz sim (interpolated, time-based smoothing); 
 quality drops automatically on sustained low fps (phones start lower). Press F3 for an fps/quality readout.
 
 ## Balance testing
-`__sim(idA, idB, n, level)` in the browser console plays CPU-vs-CPU matches at full speed and returns win counts (level 0-2). Last round-robin (30 matches per pairing): all 8 fighters between 43% and 57% at Normal and 46% to 56% at Hard.
+`__sim(idA, idB, n, level)` in the browser console plays CPU-vs-CPU matches at full speed and returns win counts (level 0-2). Last round-robin (24 matches per pairing, after doubling health and widening the arena): all 8 fighters between 43% and 57% at Normal.
 Tuning notes: stats kept within about +/-8% (speed/power/health multiply, so small differences matter); a summoned backup is chip-damage only (no stun, cannot KO) at 12% power, because even weak helpers swung win rates by ~17 points.

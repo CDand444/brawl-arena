@@ -16,7 +16,7 @@
  "sleeves": "long",
  "stats": {
   "speed": 1.0,
-  "power": 1.0,
+  "power": 0.98,
   "health": 1.0
  },
  "special": {

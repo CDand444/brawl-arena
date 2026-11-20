@@ -22,7 +22,7 @@ const glowSprite = (color, sx, sy, x, y, z) => {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
   s.scale.set(sx, sy, 1); s.position.set(x, y, z); return s;
 };
-const sky = (G, stops) => { const m = new THREE.Mesh(new THREE.SphereGeometry(70, 24, 16), new THREE.MeshBasicMaterial({ map: gradTex(stops), side: THREE.BackSide, fog: false })); G.add(m); return m; };
+const sky = (G, stops) => { const m = new THREE.Mesh(new THREE.SphereGeometry(150, 24, 16), new THREE.MeshBasicMaterial({ map: gradTex(stops), side: THREE.BackSide, fog: false })); G.add(m); return m; };
 const floorPlane = (G, tex, rough = 0.6, metal = 0.1) => {
   const f = new THREE.Mesh(new THREE.PlaneGeometry(96, 20), new THREE.MeshStandardMaterial({ map: tex, roughness: rough, metalness: metal }));
   f.rotation.x = -Math.PI / 2; f.receiveShadow = true; G.add(f); return f;
@@ -30,7 +30,7 @@ const floorPlane = (G, tex, rough = 0.6, metal = 0.1) => {
 let shadowSize = 2048; const shadowLights = [];
 const keyLight = (G, color, intensity, x, y, z) => {
   const l = new THREE.DirectionalLight(color, intensity); l.position.set(x, y, z); l.castShadow = shadowSize > 0;
-  Object.assign(l.shadow.camera, { left: -10, right: 10, top: 6, bottom: -3 }); l.shadow.mapSize.set(shadowSize || 1024, shadowSize || 1024); l.shadow.bias = -0.0005; G.add(l); shadowLights.push(l); return l;
+  Object.assign(l.shadow.camera, { left: -19, right: 19, top: 8, bottom: -4 }); l.shadow.mapSize.set(shadowSize || 1024, shadowSize || 1024); l.shadow.bias = -0.0005; G.add(l); shadowLights.push(l); return l;
 };
 const dirLight = (G, color, intensity, x, y, z) => { const l = new THREE.DirectionalLight(color, intensity); l.position.set(x, y, z); G.add(l); return l; };
 
@@ -42,7 +42,7 @@ export const MAPS = [
 ];
 
 function temple(G, scene, env) {
-  scene.fog = new THREE.Fog(0x2a0f2e, 16, 52); env.embers(0xff9a50, 1);
+  scene.fog = new THREE.Fog(0x2a0f2e, 34, 110); env.embers(0xff9a50, 1);
   sky(G, [[0, '#0d0518'], [0.45, '#3a1038'], [0.7, '#8a2a3c'], [1, '#e0703a']]);
   G.add(new THREE.HemisphereLight(0xb8a8ff, 0x401828, 1.0));
   keyLight(G, 0xffe2c4, 2.6, 3, 7, 7); dirLight(G, 0x6a8aff, 1.8, -4, 4, -7);
@@ -70,7 +70,7 @@ function temple(G, scene, env) {
 }
 
 function arch(G, scene, env) {
-  scene.fog = new THREE.Fog(0xd29a78, 22, 70); env.embers(0xffe0a0, 0.5);
+  scene.fog = new THREE.Fog(0xd29a78, 40, 130); env.embers(0xffe0a0, 0.5);
   sky(G, [[0, '#18286a'], [0.35, '#5a5a9a'], [0.62, '#e88a6a'], [0.82, '#ffb878'], [1, '#ffd89a']]);
   const sun = glowSprite(0xffcf80, 30, 30, 16, 3.5, -48); sun.material.fog = false; G.add(sun);
   const core = glowSprite(0xfff2d0, 7, 7, 16, 3.5, -47.5); core.material.fog = false; G.add(core);
@@ -121,7 +121,7 @@ function arch(G, scene, env) {
 }
 
 function city(G, scene, env) {
-  scene.fog = new THREE.Fog(0x140a26, 14, 56); env.embers(0x66e8ff, 0); env.rain(true);
+  scene.fog = new THREE.Fog(0x140a26, 30, 105); env.embers(0x66e8ff, 0); env.rain(true);
   sky(G, [[0, '#06020e'], [0.45, '#220c44'], [0.8, '#6a2478'], [1, '#d04a8a']]);
   G.add(new THREE.HemisphereLight(0x8a7aff, 0x201030, 0.95));
   keyLight(G, 0xff9ad0, 2.3, 4, 6, 7); dirLight(G, 0x30d8ff, 2.4, -5, 4, -6);

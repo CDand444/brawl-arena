@@ -13,8 +13,8 @@
  "build": 1.05,
  "sleeves": "short",
  "stats": {
-  "speed": 1.0,
-  "power": 1.0,
+  "speed": 1.02,
+  "power": 1.03,
   "health": 1.0
  },
  "special": {

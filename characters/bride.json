@@ -15,7 +15,7 @@
  "gown": true,
  "stats": {
   "speed": 0.98,
-  "power": 1.0,
+  "power": 0.98,
   "health": 1.0
  },
  "special": {

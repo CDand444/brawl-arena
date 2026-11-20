@@ -206,3 +206,5 @@ export function applyPose(rig, name, u = 0, k = 0.4, look = 0) {
   rig.torso.rotation.x = c.lean; rig.head.rotation.x = c.headX - c.lean * 0.5; rig.head.rotation.y = look;
   rig.body.position.y = c.drop + 0.22 * c.fall; rig.body.rotation.x = -1.5 * c.fall;
 }
+
+export { MAT as toonMat, OUTLINE };
