@@ -42,6 +42,6 @@ export class Net {
   close() { try { this.conn && this.conn.close(); this.peer && this.peer.destroy(); } catch (e) {} this.conn = null; this.peer = null; }
 }
 
-const KEYS = ['l', 'r', 'u', 'd', 'lp', 'hp', 'lk', 'hk', 'bl', 'run'];
+const KEYS = ['l', 'r', 'u', 'd', 'lp', 'hp', 'lk', 'hk', 'bl', 'run', 'sp', 'ult'];
 export const packInput = (i) => KEYS.reduce((n, k, b) => n | (i[k] ? 1 << b : 0), 0);
-export const unpackInput = (n) => { const o = { sp: 0 }; KEYS.forEach((k, b) => (o[k] = (n >> b) & 1)); return o; };
+export const unpackInput = (n) => { const o = {}; KEYS.forEach((k, b) => (o[k] = (n >> b) & 1)); return o; };

@@ -27,7 +27,8 @@
  },
  "special": {
   "name": "Drive-By",
-  "color": "#ffd02a"
+  "color": "#ffd02a",
+  "type": "fast"
  },
  "face": {
   "src": "faces/cap.enc",
@@ -37,5 +38,9 @@
    115,
    130
   ]
+ },
+ "ultimate": {
+  "name": "Big Homie Energy",
+  "color": "#ffd02a"
  }
 }

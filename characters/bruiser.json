@@ -27,7 +27,8 @@
  },
  "special": {
   "name": "Hype Wave",
-  "color": "#ffb02a"
+  "color": "#ffb02a",
+  "type": "fireball"
  },
  "face": {
   "src": "faces/bruiser.enc",
@@ -38,5 +39,9 @@
    233
   ],
   "bright": 1.7
+ },
+ "ultimate": {
+  "name": "Rise And Grind",
+  "color": "#ffb02a"
  }
 }

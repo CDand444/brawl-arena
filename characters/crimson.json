@@ -29,7 +29,8 @@
  },
  "special": {
   "name": "Filibuster",
-  "color": "#ff3a3a"
+  "color": "#ff3a3a",
+  "type": "fast"
  },
  "face": {
   "src": "faces/crimson.enc",
@@ -40,5 +41,9 @@
    205
   ],
   "bright": 1.35
+ },
+ "ultimate": {
+  "name": "Executive Order",
+  "color": "#ff2a2a"
  }
 }

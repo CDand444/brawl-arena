@@ -20,7 +20,8 @@
  },
  "special": {
   "name": "Code Blue",
-  "color": "#4ac8ff"
+  "color": "#4ac8ff",
+  "type": "fireball"
  },
  "face": {
   "src": "faces/bride.enc",
@@ -34,5 +35,9 @@
  "coat": "#f4f8fb",
  "extras": [
   "stethoscope"
- ]
+ ],
+ "ultimate": {
+  "name": "Bedside Manner",
+  "color": "#4ac8ff"
+ }
 }

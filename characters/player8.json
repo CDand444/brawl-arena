@@ -21,7 +21,8 @@
  },
  "special": {
   "name": "Meet the Parents",
-  "color": "#ffd02a"
+  "color": "#ffd02a",
+  "type": "fireball"
  },
  "face": {
   "src": "faces/player8.enc",
@@ -31,5 +32,9 @@
    300,
    360
   ]
+ },
+ "ultimate": {
+  "name": "Dinner Table Talk",
+  "color": "#ffd02a"
  }
 }

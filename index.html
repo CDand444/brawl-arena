@@ -21,7 +21,13 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
 #hud{position:fixed;left:0;right:0;top:0;padding:10px 14px;pointer-events:none;display:flex;gap:10px;align-items:flex-start}
 .side{flex:1}.bar{height:20px;border:2px solid #fff;background:#300;transform:skewX(-12deg);overflow:hidden}
 .bar>div{height:100%;background:linear-gradient(#ffe45a,#e8791a)}
-#hp0{float:right}#hp1{float:left}
+#hp0,#m0{float:right}#hp1,#m1{float:left}
+.meter{height:8px;margin-top:3px;border:1px solid #8cf;background:#012;transform:skewX(-12deg);overflow:hidden;clear:both}.meter>div{height:100%;width:0;background:linear-gradient(#8fecff,#2a7aff)}
+.meter.full{box-shadow:0 0 10px #8cf;animation:pulse .45s infinite alternate}.meter.full>div{background:#fff}@keyframes pulse{to{filter:brightness(1.6)}}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+#tips{position:fixed;left:10px;top:96px;max-width:min(360px,74vw);background:#000b;border:2px solid #ffd54a;border-radius:10px;padding:8px 12px;font:13px/1.55 system-ui,sans-serif;cursor:pointer;z-index:5}
+#tips h4{margin:0 0 4px;color:#ffd54a;font:15px Impact,sans-serif;letter-spacing:1px}#tips i{font:11px system-ui;color:#aaa}#tips b{color:#ffd54a}#tips small{color:#bbb}
+#tipsBtn{position:fixed;right:8px;bottom:50px;font-size:14px;padding:6px 12px;opacity:.7}@media (pointer:coarse){#tipsBtn{bottom:auto;top:50px}}
 .nm{font-size:18px;margin:2px 0;text-shadow:0 2px 0 #000}.pips{font-size:16px;color:#ffd54a}
 #hud .side:last-of-type .nm,#hud .side:last-of-type .pips{text-align:right}
 #timer{font-size:40px;width:70px;text-align:center;text-shadow:0 2px 0 #000;color:#ffd54a}
@@ -35,7 +41,7 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
 #dpad{position:absolute;left:max(18px,env(safe-area-inset-left));bottom:18px;width:min(36vw,170px);height:min(36vw,170px);border-radius:50%;background:#fff2;border:2px solid #fff6}
 #knob{position:absolute;left:50%;top:50%;width:40%;height:40%;margin:-20% 0 0 -20%;border-radius:50%;background:#fff6}
 #btns{position:absolute;right:max(14px,env(safe-area-inset-right));bottom:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-#btns button{width:min(17vw,74px);height:min(17vw,74px);border-radius:50%;padding:0;font-size:14px;background:#8a1d1d99}
+#btns button{width:min(15vw,12vh,70px);height:min(15vw,12vh,70px);border-radius:50%;padding:0;font-size:14px;background:#8a1d1d99}
 #btns button.down{background:#ffd54a;color:#000}
 @media (pointer:coarse){#pauseBtn{bottom:auto;top:8px}}
 </style></head><body>
@@ -60,7 +66,7 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
   <label>CPU difficulty <select id="diff"><option value="0">Easy</option><option value="1" selected>Normal</option><option value="2">Hard</option></select></label>
   <div class="help"><b>P1:</b> move WASD · LP F · HP G · LK C · HK V · Block Shift · Run X<br>
   <b>P2:</b> move arrows · LP U · HP I · LK J · HK K · Block L · Run O (or numpad 4/5/1/2/0/3)<br>
-  <b>Moves:</b> ↓+HP uppercut · ↓+LK sweep · ↓,↘,→ + punch fireball · jump + attack · hold Block to guard (crouch-block stops sweeps)<br>
+  <b>Moves:</b> ↓+HP uppercut · ↓+LK sweep · jump + attack · hold Block to guard · P1 <b>E</b> / P2 <b>P</b> ranged special (or ↓↘→ + punch) · fill the blue SUPER bar, then P1 <b>R</b> / P2 <b>;</b> ULTIMATE (or ↓↘→ + HK)<br>
   <b>Phone:</b> on-screen pad + buttons (1 Player mode). Esc = pause.</div>
 </div>
 
@@ -80,10 +86,11 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
 </div>
 
 <div id="hud" class="hidden">
-  <div class="side"><div class="nm" id="n0"></div><div class="bar"><div id="hp0"></div></div><div class="pips" id="p0"></div></div>
+  <div class="side"><div class="nm" id="n0"></div><div class="bar"><div id="hp0"></div></div><div class="meter"><div id="m0"></div></div><div class="pips" id="p0"></div></div>
   <div id="timer">99</div>
-  <div class="side"><div class="nm" id="n1"></div><div class="bar"><div id="hp1"></div></div><div class="pips" id="p1"></div></div>
+  <div class="side"><div class="nm" id="n1"></div><div class="bar"><div id="hp1"></div></div><div class="meter"><div id="m1"></div></div><div class="pips" id="p1"></div></div>
 </div>
+<div id="flash"></div><div id="tips" class="hidden"></div><button id="tipsBtn" class="hidden">?</button>
 <div id="banner" class="hidden"></div><div id="combo"></div>
 <div id="endbar" class="hidden"><button id="rematch">REMATCH</button><button id="menuBtn2">MENU</button></div>
 <button id="pauseBtn" class="hidden">❚❚</button>
@@ -94,12 +101,13 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
   <div id="btns">
     <button data-btn="lp">LP</button><button data-btn="hp">HP</button><button data-btn="run">RUN</button>
     <button data-btn="lk">LK</button><button data-btn="hk">HK</button><button data-btn="bl">BLOCK</button>
+    <span></span><button data-btn="sp">SPECIAL</button><button data-btn="ult" style="background:#1a4aa8aa">ULT</button>
   </div>
 </div>
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="src/game.js?v=6"></script>
+<script type="module" src="src/game.js?v=7"></script>
 <script>
 // pause button visible only while fighting
 new MutationObserver(()=>{document.getElementById('pauseBtn').classList.toggle('hidden',document.getElementById('hud').classList.contains('hidden'))}).observe(document.getElementById('hud'),{attributes:true});

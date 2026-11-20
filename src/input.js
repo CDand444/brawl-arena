@@ -1,10 +1,10 @@
 // Input: keyboard (P1 + P2 maps), touch (virtual pad + buttons). Every source yields the same shape.
-export const EMPTY = () => ({ l: 0, r: 0, u: 0, d: 0, lp: 0, hp: 0, lk: 0, hk: 0, bl: 0, run: 0, sp: 0 });
+export const EMPTY = () => ({ l: 0, r: 0, u: 0, d: 0, lp: 0, hp: 0, lk: 0, hk: 0, bl: 0, run: 0, sp: 0, ult: 0 });
 
 export const KEYMAPS = {
-  p1: { KeyA: 'l', KeyD: 'r', KeyW: 'u', KeyS: 'd', KeyF: 'lp', KeyG: 'hp', KeyC: 'lk', KeyV: 'hk', ShiftLeft: 'bl', KeyX: 'run' },
+  p1: { KeyA: 'l', KeyD: 'r', KeyW: 'u', KeyS: 'd', KeyF: 'lp', KeyG: 'hp', KeyC: 'lk', KeyV: 'hk', ShiftLeft: 'bl', KeyX: 'run', KeyE: 'sp', KeyR: 'ult' },
   p2: { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd', KeyU: 'lp', KeyI: 'hp', KeyJ: 'lk', KeyK: 'hk', KeyL: 'bl', KeyO: 'run',
-        Numpad4: 'lp', Numpad5: 'hp', Numpad1: 'lk', Numpad2: 'hk', Numpad0: 'bl', Numpad3: 'run' },
+        Numpad4: 'lp', Numpad5: 'hp', Numpad1: 'lk', Numpad2: 'hk', Numpad0: 'bl', Numpad3: 'run', KeyP: 'sp', Semicolon: 'ult', Numpad6: 'sp', Numpad9: 'ult' },
 };
 
 const keys = new Set();

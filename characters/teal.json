@@ -19,7 +19,8 @@
  },
  "special": {
   "name": "Tidal",
-  "color": "#2affd8"
+  "color": "#2affd8",
+  "type": "fast"
  },
  "face": {
   "src": "faces/teal.enc",
@@ -29,5 +30,9 @@
    26,
    30
   ]
+ },
+ "ultimate": {
+  "name": "Because I Said So",
+  "color": "#2affd8"
  }
 }

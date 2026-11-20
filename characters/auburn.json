@@ -24,7 +24,8 @@
  },
  "special": {
   "name": "Ember",
-  "color": "#ff6a2a"
+  "color": "#ff6a2a",
+  "type": "fireball"
  },
  "face": {
   "src": "faces/auburn.enc",
@@ -34,5 +35,9 @@
    730,
    820
   ]
+ },
+ "ultimate": {
+  "name": "Sweet Revenge",
+  "color": "#ff6aa0"
  }
 }

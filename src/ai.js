@@ -8,6 +8,7 @@ export function makeAI(self, opp, level = 1) {
 
   const think = () => {
     const dx = Math.abs(opp.x - self.x), r = Math.random();
+    if (self.meter >= 100 && dx > 1.2 && Math.random() < 0.4) return { n: 50, press: { ult: 1 } };
     const oppAttacking = opp.state === 'attack' || (opp.state === 'air' && opp.airMove);
     if (oppAttacking && dx < 2 && r < blockP) return { n: rnd(14, 26), hold: { bl: 1 }, crouch: Math.random() < 0.3 };
     if (opp.y > 0.5 && dx < 2.2 && Math.random() < aggr) return { n: 22, press: { d: 1, hp: 1 } };

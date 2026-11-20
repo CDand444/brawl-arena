@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=6';
-import { loadFaces, canDecrypt } from './faces.js?v=6';
-import { Fighter, MOVES } from './fighter.js?v=6';
-import { makeAI } from './ai.js?v=6';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=6';
-import { Net, packInput, unpackInput } from './net.js?v=6';
-import { buildStage } from './stage.js?v=6';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=7';
+import { loadFaces, canDecrypt } from './faces.js?v=7';
+import { Fighter, MOVES } from './fighter.js?v=7';
+import { makeAI } from './ai.js?v=7';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=7';
+import { Net, packInput, unpackInput } from './net.js?v=7';
+import { buildStage } from './stage.js?v=7';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -85,7 +85,7 @@ $('diff').onchange = (e) => (diff = +e.target.value);
 function goMenu() {
   if (mode === 'online') { net.close(); net = new Net(); }
   mode = 'ai'; phase = 'menu'; clearFighters(); previewRoot.visible = true; setPreview(0, null); setPreview(1, null); paused = false;
-  ['select', 'hud', 'touch', 'endbar', 'pause', 'online', 'banner'].forEach((i) => show(i, false)); show('menu');
+  ['select', 'hud', 'touch', 'endbar', 'pause', 'online', 'banner', 'tips', 'tipsBtn'].forEach((i) => show(i, false)); show('menu');
 }
 $('btnMenu').onclick = $('menuBtn2').onclick = goMenu;
 $('rematch').onclick = () => {
@@ -159,8 +159,18 @@ function startMatch() {
   $('n0').textContent = picks[0].name; $('n1').textContent = mode === 'ai' ? picks[1].name + ' (CPU)' : picks[1].name;
   wins = [0, 0]; round = 1; flawless = [true, true];
   show('hud'); show('touch', coarse && mode !== 'p2'); show('rematch'); $('rematch').textContent = 'REMATCH'; paused = false; show('pause', false);
-  newRound();
+  newRound(); showTips(true); show('tipsBtn');
 }
+function tipsHtml() {
+  const k = (a, b) => `<b>${a}</b> ${b}`;
+  if (coarse) return `<h4>HOW TO FIGHT <i>(tap to close)</i></h4>Pad (left): move, up = jump, down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('SPECIAL', 'ranged shot')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
+  const p2 = mode === '2p' ? `<br><b>P2:</b> arrows move · U/I punch · J/K kick · L block · O run · <b>P</b> special · <b>;</b> ultimate` : '';
+  return `<h4>HOW TO FIGHT <i>(click to close)</i></h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked. Esc = pause.</small>`;
+}
+function showTips(on = true) { $('tips').innerHTML = tipsHtml(); show('tips', on); }
+$('tips').onclick = () => show('tips', false);
+$('tipsBtn').onclick = () => showTips($('tips').classList.contains('hidden'));
+
 function newRound() {
   projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = [];
   fighters[0].reset(-2); fighters[1].reset(2);
@@ -169,12 +179,23 @@ function newRound() {
 }
 function banner(t, sub = '') { $('banner').innerHTML = t + (sub ? `<small>${sub}</small>` : ''); show('banner', !!t); }
 
-game.spawnProjectile = (f) => {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshBasicMaterial({ color: css(f.def.special?.color ?? '#ff7a1a') }));
-  mesh.add(new THREE.PointLight(css(f.def.special?.color ?? '#ff7a1a'), 4, 6)); mesh.add(stage.glow(css(f.def.special?.color ?? '#ff7a1a'), 2.2));
-  mesh.position.set(f.x + f.face * 0.8, 1.35, 0); scene.add(mesh);
-  projectiles.push({ owner: f, mesh, x: f.x + f.face * 0.8, dir: f.face, dmg: MOVES.fb.dmg });
-  f.fbCooldown = 50; sfx(300, 0.2, 'sawtooth');
+// Ranged special types (set per character in JSON: special.type): fireball = mid height (duck it), low = ground wave (jump it), fast = quick shot
+const SPECIALS = { fireball: { py: 1.35, speed: 0.12, dmg: 10, size: 0.28 }, low: { py: 0.45, speed: 0.14, dmg: 8, size: 0.3, low: true }, fast: { py: 1.35, speed: 0.2, dmg: 7, size: 0.22 } };
+let ultT = 0;
+game.spawnProjectile = (f, kind = 'fb') => {
+  const ult = kind === 'ult', sp = ult ? { py: 1.1, speed: 0.26, dmg: MOVES.ult.dmg, size: 0.7 } : (SPECIALS[f.def.special?.type] || SPECIALS.fireball);
+  const color = css(ult ? (f.def.ultimate?.color ?? f.def.special?.color ?? '#ffffff') : (f.def.special?.color ?? '#ff7a1a'));
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(sp.size, 16, 12), new THREE.MeshBasicMaterial({ color }));
+  mesh.add(new THREE.PointLight(color, ult ? 10 : 4, ult ? 12 : 6)); mesh.add(stage.glow(color, ult ? 6 : 2.2));
+  if (ult) mesh.scale.set(1.8, 1.2, 1);
+  mesh.position.set(f.x + f.face * 0.8, sp.py, 0); scene.add(mesh);
+  projectiles.push({ owner: f, mesh, x: f.x + f.face * 0.8, dir: f.face, dmg: sp.dmg, speed: sp.speed, py: sp.py, hh: ult ? 1.0 : 0.22, low: !!sp.low, unblockable: ult, color: ult ? 0xffffff : 0xffb060, ult });
+  if (!ult) f.fbCooldown = 50;
+  sfx(ult ? 150 : 300, ult ? 0.5 : 0.2, 'sawtooth', ult ? 0.12 : 0.05);
+};
+game.onUlt = (f) => { // cosmetic only (must not touch sim state)
+  ultT = 70; banner((f.def.ultimate?.name || 'ULTIMATE').toUpperCase() + '!'); stage.shake += 0.7; sfx(80, 0.6, 'sawtooth', 0.12);
+  const el = $('flash'); el.style.transition = 'none'; el.style.opacity = 0.85; requestAnimationFrame(() => { el.style.transition = 'opacity .7s'; el.style.opacity = 0; });
 };
 game.tryHit = (att, def, m) => {
   if (def.inv > 0 || phase !== 'fight') return false;
@@ -199,6 +220,7 @@ function step60() {
   }
   const none = EMPTY();
   const [a, b] = fighters;
+  if (ultT > 0 && --ultT === 0 && phase === 'fight') banner('');
   if (phase === 'fight') { timer--; a.update(b, game); b.update(a, game); }
   else { a.update(b, game, none); b.update(a, game, none); }
   // separation
@@ -208,10 +230,12 @@ function step60() {
   }
   // projectiles
   for (const p of projectiles) {
-    p.x += p.dir * 0.12; p.mesh.position.x = p.x; if (Math.random() < 0.6) stage.spark(p.x - p.dir * 0.3, 1.35, 1, 0xffb060, 0.5);
-    const t = p.owner === a ? b : a;
-    if (phase === 'fight' && Math.abs(p.x - t.x) < 0.45 && t.y < 1.9 && t.inv === 0 && t.state !== 'down' && t.state !== 'getup') {
-      p.dead = true; stage.spark(p.x, 1.4, 22, 0xff9a3a, 1.4); stage.shake += 0.5; t.receive(p.owner, { dmg: p.dmg, kb: 0.1, hs: 22, bs: 14, knock: true }, game); sfx(160, 0.15, 'sawtooth', 0.09);
+    p.x += p.dir * p.speed; p.mesh.position.x = p.x;
+    if (Math.random() < (p.ult ? 1 : 0.6)) stage.spark(p.x - p.dir * 0.3, p.py + (Math.random() - 0.5) * (p.ult ? 1.2 : 0), p.ult ? 2 : 1, p.color, p.ult ? 0.9 : 0.5); // cosmetic only
+    const t = p.owner === a ? b : a, top = t.y + (t.crouching ? 1.25 : 1.95);
+    if (phase === 'fight' && Math.abs(p.x - t.x) < 0.45 + (p.ult ? 0.3 : 0) && p.py + p.hh >= t.y && p.py - p.hh <= top && t.inv === 0 && t.state !== 'down' && t.state !== 'getup') {
+      p.dead = true; stage.spark(p.x, p.py, p.ult ? 40 : 22, p.ult ? 0xffffff : 0xff9a3a, p.ult ? 2 : 1.4); stage.shake += p.ult ? 1 : 0.5;
+      t.receive(p.owner, { dmg: p.dmg, kb: p.ult ? 0.2 : 0.1, hs: 22, bs: 14, knock: true, low: p.low, unblockable: p.unblockable }, game); sfx(160, 0.15, 'sawtooth', 0.09);
     }
     if (Math.abs(p.x) > 12) p.dead = true;
   }
@@ -278,6 +302,7 @@ function loop(now) {
       frameCamera((a.x + b.x) / 2, Math.abs(a.x - b.x));
       $('hp0').style.width = Math.max(0, (a.hp / a.maxHp) * 100) + '%';
       $('hp1').style.width = Math.max(0, (b.hp / b.maxHp) * 100) + '%';
+      [a, b].forEach((f, i) => { $('m' + i).style.width = Math.min(100, f.meter) + '%'; $('m' + i).parentElement.classList.toggle('full', f.meter >= 100); });
       $('timer').textContent = Math.max(0, Math.ceil(timer / 60));
     }
   }
@@ -289,7 +314,7 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-const V = 6; // bump to bust browser caches after updates
+const V = 7; // bump to bust browser caches after updates
 async function boot() {
   await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
   const withFace = defs.filter((d) => d.face).length;

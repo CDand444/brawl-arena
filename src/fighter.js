@@ -10,7 +10,8 @@ export const MOVES = {
   sweep: { s: 8, a: 4, r: 22, dmg: 8,  reach: 1.6,  y: [0, 0.5],   low: true, knock: true, kb: 0.14, bs: 14, pose: 'sweep', crouching: true },
   jp:    { air: true, dmg: 7, reach: 1.1, y: [0.7, 1.9], hs: 18, bs: 10, kb: 0.1, pose: 'jp' },
   jk:    { air: true, dmg: 8, reach: 1.4, y: [0.2, 1.3], hs: 18, bs: 10, kb: 0.12, pose: 'jk' },
-  fb:    { s: 14, a: 0, r: 16, dmg: 10, pose: 'fireball', projectile: true },
+  fb:    { s: 14, a: 0, r: 16, dmg: 10, pose: 'fireball', projectile: 'fb' },
+  ult:   { s: 34, a: 0, r: 26, dmg: 30, pose: 'fireball', projectile: 'ult' }, // Ultimate: needs a full Super meter
 };
 
 export class Fighter {
@@ -23,7 +24,7 @@ export class Fighter {
 
   reset(x) {
     Object.assign(this, { x, y: 0, vy: 0, vx: 0, face: this.side === 0 ? 1 : -1, hp: this.maxHp, state: 'idle', t: 0, move: null, airMove: null,
-      hitDone: false, comboHits: 0, comboDmg: 0, inv: 0, stun: 0, crouchBlock: false, prev: EMPTY(), hist: [], fbCooldown: 0, u: 0 });
+      hitDone: false, comboHits: 0, comboDmg: 0, inv: 0, stun: 0, crouchBlock: false, prev: EMPTY(), hist: [], fbCooldown: 0, u: 0, meter: 0 });
   }
 
   get crouching() { return this.state === 'crouch' || (this.state === 'block' && this.crouchBlock) || (this.state === 'attack' && this.move.crouching); }
@@ -63,6 +64,8 @@ export class Fighter {
     switch (this.state) {
       case 'idle': case 'walk': case 'run': case 'crouch': case 'block': {
         this.crouchBlock = false;
+        const wantUlt = this.meter >= 100 && (pr.ult || (pr.hk && this.hasQCF()));
+        if (wantUlt) { this.meter = 0; this.startAttack('ult'); this.hist.length = 0; if (game.onUlt) game.onUlt(this); break; }
         const canSpecial = (pr.lp || pr.hp || pr.sp) && this.fbCooldown === 0 && (pr.sp || this.hasQCF());
         if (canSpecial) { this.startAttack('fb'); this.hist.length = 0; break; }
         if (pr.hp && inp.d) { this.startAttack('up'); break; }
@@ -81,7 +84,7 @@ export class Fighter {
       }
       case 'attack': {
         const m = this.move;
-        if (m.projectile) { if (this.t === m.s) game.spawnProjectile(this); }
+        if (m.projectile) { if (this.t === m.s) game.spawnProjectile(this, m.projectile); }
         else if (this.t > m.s && this.t <= m.s + m.a && !this.hitDone) {
           if (game.tryHit(this, opp, m)) this.hitDone = true;
           if (m.reach > 1.5) this.x += this.face * 0.01;
@@ -113,11 +116,16 @@ export class Fighter {
     const kbDir = att.face;
     if (blocking) {
       this.hp -= m.dmg * 0.08 * att.power;
+      this.meter = Math.min(100, this.meter + m.dmg * 0.3); att.meter = Math.min(100, att.meter + m.dmg * 0.2);
       this.state = 'blockstun'; this.t = 0; this.stun = m.bs; this.vx = kbDir * (m.kb + 0.05);
       return 'block';
     }
     let scale = 1; for (let i = 0; i < this.comboHits; i++) scale *= 0.88; // no Math.pow: must be bit-identical across browsers (online lockstep)
     const dmg = m.dmg * att.power * scale;
+    this.meter = Math.min(100, this.meter + dmg * 0.8); att.meter = Math.min(100, att.meter + dmg * 1.2);
+    if (this.state === 'attack' && this.move.projectile === 'ult' && this.t <= this.move.s && this.hp - dmg * 0.5 > 0) { // super armor while charging an Ultimate
+      this.hp -= dmg * 0.5; this.comboHits++; return 'hit';
+    }
     this.hp = Math.max(0, this.hp - dmg); this.comboHits++; att.comboDmg = (att.comboHits = this.comboHits, dmg);
     this.t = 0;
     if (m.launch || m.knock || this.hp <= 0 || !this.grounded) {

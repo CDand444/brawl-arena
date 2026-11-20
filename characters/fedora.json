@@ -30,7 +30,8 @@
  },
  "special": {
   "name": "Hat Trick",
-  "color": "#ff4a4a"
+  "color": "#ff4a4a",
+  "type": "low"
  },
  "face": {
   "src": "faces/fedora.enc",
@@ -46,5 +47,9 @@
  "extras": [
   "tie"
  ],
- "tie": "#c9a227"
+ "tie": "#c9a227",
+ "ultimate": {
+  "name": "Thing One and Thing Two",
+  "color": "#ff4a4a"
+ }
 }
