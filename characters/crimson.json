@@ -1,6 +1,6 @@
 {
- "name": "Crimson",
- "tagline": "Leather jacket, quick kicks",
+ "name": "The Politician",
+ "tagline": "Votes for violence",
  "skin": "#7a4a30",
  "hair": {
   "style": "long",
@@ -28,8 +28,8 @@
   "health": 0.95
  },
  "special": {
-  "name": "Blood Moon",
-  "color": "#ff2a4a"
+  "name": "Filibuster",
+  "color": "#ff3a3a"
  },
  "face": {
   "src": "faces/crimson.enc",

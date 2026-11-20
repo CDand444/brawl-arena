@@ -1,6 +1,6 @@
 {
- "name": "Bride",
- "tagline": "Elegant but deadly",
+ "name": "Doctor Wife",
+ "tagline": "Bride on call",
  "skin": "#7a4a32",
  "hair": {
   "style": "updo",
@@ -19,7 +19,20 @@
   "health": 1.05
  },
  "special": {
-  "name": "Veil Strike",
-  "color": "#ffffff"
- }
+  "name": "Code Blue",
+  "color": "#4ac8ff"
+ },
+ "face": {
+  "src": "faces/bride.enc",
+  "crop": [
+   108,
+   5,
+   26,
+   29
+  ]
+ },
+ "coat": "#f4f8fb",
+ "extras": [
+  "stethoscope"
+ ]
 }

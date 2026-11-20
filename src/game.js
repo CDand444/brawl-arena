@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=4';
-import { loadFaces, canDecrypt } from './faces.js?v=4';
-import { Fighter, MOVES } from './fighter.js?v=4';
-import { makeAI } from './ai.js?v=4';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=4';
-import { Net, packInput, unpackInput } from './net.js?v=4';
-import { buildStage } from './stage.js?v=4';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=5';
+import { loadFaces, canDecrypt } from './faces.js?v=5';
+import { Fighter, MOVES } from './fighter.js?v=5';
+import { makeAI } from './ai.js?v=5';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=5';
+import { Net, packInput, unpackInput } from './net.js?v=5';
+import { buildStage } from './stage.js?v=5';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -289,7 +289,7 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-const V = 4; // bump to bust browser caches after updates
+const V = 5; // bump to bust browser caches after updates
 async function boot() {
   await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
   const withFace = defs.filter((d) => d.face).length;

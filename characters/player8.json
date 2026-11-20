@@ -1,0 +1,35 @@
+{
+ "name": "Fighter 8",
+ "tagline": "New challenger",
+ "skin": "#6b4630",
+ "hair": {
+  "style": "short",
+  "color": "#15100e"
+ },
+ "beard": "#15100e",
+ "eyes": "#1a1008",
+ "top": "#15151c",
+ "jacket": "#b08a68",
+ "bottom": "#1c1c24",
+ "shoes": "#4a2e1a",
+ "build": 1.05,
+ "sleeves": "long",
+ "stats": {
+  "speed": 1,
+  "power": 1,
+  "health": 1
+ },
+ "special": {
+  "name": "Power Move",
+  "color": "#ffd02a"
+ },
+ "face": {
+  "src": "faces/player8.enc",
+  "crop": [
+   395,
+   215,
+   300,
+   360
+  ]
+ }
+}

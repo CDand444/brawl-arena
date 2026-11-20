@@ -1,9 +1,9 @@
 {
- "name": "Bruiser",
- "tagline": "Heavy hitter, short locs",
+ "name": "Tha Motivator",
+ "tagline": "Believe it. Then hit it.",
  "skin": "#4a2e20",
  "hair": {
-  "style": "locs",
+  "style": "dreads",
   "color": "#120c0c"
  },
  "beard": "#120c0c",
@@ -26,8 +26,8 @@
   "health": 1.15
  },
  "special": {
-  "name": "Shadow Fist",
-  "color": "#9a6aff"
+  "name": "Hype Wave",
+  "color": "#ffb02a"
  },
  "face": {
   "src": "faces/bruiser.enc",

@@ -1,6 +1,6 @@
 {
- "name": "Fedora",
- "tagline": "Smooth and stylish",
+ "name": "Cat in the hat",
+ "tagline": "Fedora, vest, trouble",
  "skin": "#8a5a3c",
  "hair": {
   "style": "short",
@@ -8,7 +8,7 @@
  },
  "beard": "#1a1210",
  "eyes": "#1a1008",
- "top": "#15151c",
+ "top": "#f2f2ee",
  "pattern": [
   "#e8c030",
   "#e04a4a",
@@ -29,7 +29,22 @@
   "health": 1
  },
  "special": {
-  "name": "Power Pellet",
-  "color": "#ffe030"
- }
+  "name": "Hat Trick",
+  "color": "#ff4a4a"
+ },
+ "face": {
+  "src": "faces/fedora.enc",
+  "crop": [
+   245,
+   140,
+   270,
+   300
+  ],
+  "match": 0.85
+ },
+ "vest": "#7a1f2a",
+ "extras": [
+  "tie"
+ ],
+ "tie": "#c9a227"
 }

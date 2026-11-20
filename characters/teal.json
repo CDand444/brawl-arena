@@ -1,6 +1,6 @@
 {
- "name": "Teal",
- "tagline": "All-rounder",
+ "name": "Father Figure",
+ "tagline": "Calm. Disappointed. Dangerous.",
  "skin": "#9a6a4a",
  "hair": {
   "style": "short",
@@ -20,5 +20,14 @@
  "special": {
   "name": "Tidal",
   "color": "#2affd8"
+ },
+ "face": {
+  "src": "faces/teal.enc",
+  "crop": [
+   48,
+   14,
+   26,
+   30
+  ]
  }
 }

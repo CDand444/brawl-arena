@@ -1,6 +1,6 @@
 {
- "name": "Cap",
- "tagline": "Lanky and fast",
+ "name": "Luh Gang Bang",
+ "tagline": "Skinny and quick",
  "skin": "#5a3a28",
  "hair": {
   "style": "short",
@@ -26,8 +26,8 @@
   "health": 0.95
  },
  "special": {
-  "name": "Plaid Blast",
-  "color": "#7dff9a"
+  "name": "Drive-By",
+  "color": "#ffd02a"
  },
  "face": {
   "src": "faces/cap.enc",
