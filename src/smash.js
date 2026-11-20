@@ -8,15 +8,15 @@ import * as THREE from 'three';
    ====================================================================================== */
 
 const COLORS = ['#ff4a4a', '#4aa8ff', '#ffd02a', '#5aff8a'];
-const MAIN = 7;                                        // main stage half-width
-const BZ = { x: 16.5, top: 13.5, bottom: -8 };         // blast zones
+const MAIN = 9.1;                                      // main stage half-width
+const BZ = { x: 21.5, top: 13.5, bottom: -8 };         // blast zones
 const PLATS = [
   { x0: -MAIN, x1: MAIN, y: 0, soft: false },          // main stage (solid)
-  { x0: -5.4, x1: -2.2, y: 2.7, soft: true },          // floating platforms (jump up through, tap down to drop)
-  { x0: 2.2, x1: 5.4, y: 2.7, soft: true },
-  { x0: -1.6, x1: 1.6, y: 5.2, soft: true },
+  { x0: -7, x1: -2.9, y: 2.7, soft: true },            // floating platforms (jump up through, tap down to drop)
+  { x0: 2.9, x1: 7, y: 2.7, soft: true },
+  { x0: -2.1, x1: 2.1, y: 5.2, soft: true },
 ];
-const SPAWN = [-5, 5, -2, 2], RESPAWN = [-3, 3, -1, 1];
+const SPAWN = [-6.5, 6.5, -2.6, 2.6], RESPAWN = [-3.9, 3.9, -1.3, 1.3];
 const SPECIALS = { fireball: { py: 1.35, speed: 0.12, dmg: 10, size: 0.28 }, low: { py: 0.45, speed: 0.14, dmg: 8, size: 0.3, low: true }, fast: { py: 1.35, speed: 0.2, dmg: 7, size: 0.22 } };
 const TYPES = [['kb1', 'Keyboard 1 (WASD)'], ['kb2', 'Keyboard 2 (arrows)'], ['gp0', 'Gamepad 1'], ['gp1', 'Gamepad 2'], ['gp2', 'Gamepad 3'], ['gp3', 'Gamepad 4'], ['touch', 'Touch screen'], ['cpu0', 'CPU Easy'], ['cpu1', 'CPU Normal'], ['cpu2', 'CPU Hard'], ['off', 'Off']];
 const ROOM_TYPES = ['open', 'cpu0', 'cpu1', 'cpu2'];
@@ -315,7 +315,7 @@ export function createSmash(ctx) {
     x0 = Math.max(-BZ.x + 2, Math.min(x0, -2.5)); x1 = Math.min(BZ.x - 2, Math.max(x1, 2.5));
     y0 = Math.max(BZ.bottom + 2, Math.min(y0, 0)); y1 = Math.min(BZ.top - 1, Math.max(y1 + 2.2, 3));
     const t = Math.tan((cam.fov * Math.PI) / 360), w = (x1 - x0) / 2 + 2.6, h = (y1 - y0) / 2 + 1.8;
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 + 0.3, z = Math.max(w / (t * cam.aspect), h / t, 9);
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2 + 0.3, z = Math.max(w / (t * cam.aspect), h / t, 9) * 1.3; // 30% farther out
     const s = 1 - Math.pow(0.9, dt * 60);
     cam.position.x += (cx - cam.position.x) * s; cam.position.y += (cy + 1.2 - cam.position.y) * s; cam.position.z += (z - cam.position.z) * s;
     cam.lookAt(cam.position.x, cam.position.y - 1.2, 0);

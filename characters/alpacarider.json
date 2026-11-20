@@ -1,0 +1,52 @@
+{
+ "name": "Alpaca Rider",
+ "tagline": "Black Son In Law, now on four legs",
+ "skin": "#6b4630",
+ "hair": {
+  "style": "short",
+  "color": "#15100e"
+ },
+ "beard": "#15100e",
+ "eyes": "#1a1008",
+ "top": "#15151c",
+ "jacket": "#b08a68",
+ "bottom": "#1c1c24",
+ "shoes": "#4a2e1a",
+ "build": 1.05,
+ "sleeves": "long",
+ "stats": {
+  "speed": 1.08,
+  "power": 0.96,
+  "health": 1.05
+ },
+ "special": {
+  "name": "Alpaca Spit",
+  "color": "#d8f0a0",
+  "type": "fast"
+ },
+ "face": {
+  "src": "faces/player8.enc",
+  "crop": [
+   395,
+   215,
+   300,
+   360
+  ]
+ },
+ "ultimate": {
+  "name": "Alpaca Stampede",
+  "color": "#f0d8a0",
+  "cutscene": {
+   "theme": "sunrise",
+   "color": "#f0d8a0",
+   "glyphs": "🦙🌄🦙",
+   "motion": "rise",
+   "lines": [
+    "SADDLE UP.",
+    "HE DIDN'T COME ALONE…",
+    "STAMPEDE!"
+   ]
+  }
+ },
+ "mount": "alpaca"
+}

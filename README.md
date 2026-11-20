@@ -75,6 +75,10 @@ themes: sweet, politics, sunrise, hat, street, ecg, dad, dinner (or `plain`); `m
 An `ultimate` can carry `"summon": {"id":"<character id>","chance":0.5,"seconds":10,"power":0.7,"label":"..."}`: when the Ultimate is cast there is that chance a scripted, untouchable
 ghost ally (the other character) fights alongside for that long. Tha Motivator summons White Chocolate; Black Son In Law summons The Politician. Rolls use the shared seeded RNG (`game.rand`) so online matches stay in sync.
 
+A character can ride a mount: `"mount": "alpaca"` (optional `"alpaca": {"wool","saddle","muzzle","dark"}` colors). The rider sits in the saddle, the alpaca stays on the ground and trots under them, and every jump (and double jump) is a somersault off its back. Purely cosmetic: hitboxes are unchanged. Alpaca Rider (`alpacarider.json`) is Black Son In Law on an alpaca and reuses his face file.
+
+Arena sizes: classic ring half-width 11.7 (`BOUNDS` in game.js), Smash main stage half-width 9.1 (`MAIN` in smash.js); both cameras sit 30% farther back than they used to.
+
 ## Photo faces (private)
 A character can wear a real face: `"face": {"src":"faces/<id>.enc","crop":[x,y,w,h],"bright":1,"match":0}` in its JSON.
 - Photos are stored **AES-256 encrypted** in `faces/` (public repo never holds a readable photo). The game asks for the group password once

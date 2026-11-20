@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=28';
-import { loadFaces, canDecrypt, normalize } from './faces.js?v=28';
-import { Fighter, MOVES } from './fighter.js?v=28';
-import { makeAI } from './ai.js?v=28';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=28';
-import { Net, Lobby, Room, packInput, unpackInput } from './net.js?v=28';
-import { createSmash } from './smash.js?v=28';
-import { buildStage, MAPS } from './stage.js?v=28';
+import { buildCharacter, applyPose, applyFace, updateFace, updateMount, toonMat, OUTLINE } from './model.js?v=29';
+import { loadFaces, canDecrypt, normalize } from './faces.js?v=29';
+import { Fighter, MOVES } from './fighter.js?v=29';
+import { makeAI } from './ai.js?v=29';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=29';
+import { Net, Lobby, Room, packInput, unpackInput } from './net.js?v=29';
+import { createSmash } from './smash.js?v=29';
+import { buildStage, MAPS } from './stage.js?v=29';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -28,9 +28,10 @@ function applyQuality() { renderer.setPixelRatio(Math.min(devicePixelRatio, DPR[
 function resize() { applyQuality(); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
+const ZOOM = 1.3;
 function frameCamera(cx, spread, k = 1, minHalf = 3.4) {
   const halfW = Math.max(minHalf, spread / 2 + 2.2), t = Math.tan((cam.fov * Math.PI) / 360);
-  const z = Math.max(halfW / (t * cam.aspect), (minHalf < 3 ? 1.35 : 1.8) / t);
+  const z = Math.max(halfW / (t * cam.aspect), (minHalf < 3 ? 1.35 : 1.8) / t) * (minHalf < 3 ? 1 : ZOOM); // fights sit 30% farther back
   const s = 1 - Math.pow(0.9, k); cam.position.x += (cx - cam.position.x) * s; cam.position.y = 1.5; cam.position.z += (z - cam.position.z) * s;
   cam.lookAt(cam.position.x, 1.15, 0);
 }
@@ -226,7 +227,7 @@ function tryRematch() { if (myRematch && theirRematch) { myRematch = theirRematc
 
 /* ---------- match ---------- */
 let fighters = [], projectiles = [], wins = [0, 0], round = 1, phase = 'menu', pt = 0, timer = 120 * 60, paused = false, flawless = [true, true];
-const BOUNDS = 9, game = { bounds: BOUNDS }; // expanded arena (was 5.2)
+const BOUNDS = 11.7, game = { bounds: BOUNDS }; // expanded arena (was 5.2, then 9)
 const edgePosts = [];
 for (const s of [-1, 1]) { // glowing posts mark the edge of the ring
   const post = new THREE.Mesh(new THREE.BoxGeometry(0.14, 3.4, 0.14), new THREE.MeshBasicMaterial({ color: 0xffd54a })); post.position.set(s * (BOUNDS + 0.55), 1.7, 0); scene.add(post); edgePosts.push(post);
@@ -420,7 +421,7 @@ function addItem(kind, x, y = 0, vy = 0) { const o = { kind, x, y, vy, rest: y =
 const rndKind = () => ITEM_KINDS[(game.rand() * ITEM_KINDS.length) | 0];
 function buildProps() { // two containers per side (crates or explosive barrels) + a couple of loose items near the middle
   clearProps();
-  for (const side of [-1, 1]) for (const [lo, span] of [[4.6, 1.2], [6.8, 1.2]]) addProp(game.rand() < 0.5 ? 'crate' : 'barrel', side * (lo + game.rand() * span));
+  for (const side of [-1, 1]) for (const [lo, span] of [[6, 1.6], [8.8, 1.6]]) addProp(game.rand() < 0.5 ? 'crate' : 'barrel', side * (lo + game.rand() * span));
   for (let i = 0; i < 2; i++) addItem(rndKind(), (game.rand() - 0.5) * 4);
 }
 function damageProp(p, d, by, depth = 0) {
@@ -567,6 +568,7 @@ function poseUpdate(f, alpha, dt) {
   const st = f.state, k = st === 'attack' ? 0.5 : 0.35, kk = 1 - Math.pow(1 - k, Math.min(dt, 0.05) * 60);
   applyPose(f.rig, st === 'win' ? 'win' : f.poseName(), f.u + alpha, kk, -f.face * 0.4);
   f.rig.root.position.set(f.px + (f.x - f.px) * alpha, f.py + (f.y - f.py) * alpha, 0);
+  updateMount(f.rig, f, f.rig.root.position.y, dt);
   f.rig.root.rotation.y = f.face * (Math.PI / 2 - 0.45); // 3/4 view so faces show to the camera
   updateFace(f.rig, f.face, dt);
 }
@@ -635,7 +637,7 @@ let padWas = false;
 setInterval(() => { const s = padStart(); if (s && !padWas) { if (!$('pause').classList.contains('hidden')) closePause(); else openPause(); } padWas = s; }, 100);
 $('pauseBtn').onclick = openPause;
 
-const V = 28;
+const V = 29;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [

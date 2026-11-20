@@ -134,7 +134,65 @@ export function buildCharacter(d) {
     }
   }
 
-  return { root, body, torso, head, neck: neckPivot, arms, elbows, legs, knees, feat, cur: {} };
+  const rig = { root, body, torso, head, neck: neckPivot, arms, elbows, legs, knees, feat, cur: {} };
+  if (d.mount === 'alpaca') buildAlpaca(rig, d);
+  return rig;
+}
+
+/* ---- mounts: the rider sits in a saddle; the mount stays on the ground while the rider jumps (and flips) off it ---- */
+const SADDLE = 0.4; // how far the rider's hips are lifted to sit in the saddle
+function buildAlpaca(rig, d) {
+  const a = d.alpaca || {}, wool = MAT(a.wool || 0xefe0c2), dark = MAT(a.dark || 0x5a4030), m = new THREE.Group(); rig.root.add(m);
+  const torso = new THREE.Group(); torso.position.y = 0.92; m.add(torso);
+  add(torso, cap(0.34, 0.75, 6), wool).rotation.x = Math.PI / 2;                       // fluffy body (along +z = facing)
+  for (const z of [-0.3, 0, 0.3]) add(torso, new THREE.SphereGeometry(0.2, 10, 8), wool, 0, 0.22, z, 0); // wool tufts on the back
+  add(torso, new THREE.SphereGeometry(0.12, 10, 8), wool, 0, 0.12, -0.62);             // tail
+  add(torso, new THREE.BoxGeometry(0.5, 0.1, 0.56), MAT(a.saddle || 0xb0242a), 0, 0.36, 0);       // saddle
+  add(torso, new THREE.BoxGeometry(0.72, 0.04, 0.6), MAT(0xd4af37), 0, 0.3, 0, 0);       // gold blanket trim
+  const neck = new THREE.Group(); neck.position.set(0, 0.2, 0.42); neck.rotation.x = 0.18; torso.add(neck);
+  add(neck, cap(0.15, 0.55), wool, 0, 0.42, 0);
+  const head = new THREE.Group(); head.position.set(0, 0.85, 0.04); neck.add(head);
+  add(head, new THREE.SphereGeometry(0.17, 14, 12), wool).scale.set(0.95, 1, 1.1);
+  add(head, new THREE.SphereGeometry(0.11, 12, 10), MAT(a.muzzle || 0xd8c4a0), 0, -0.05, 0.16).scale.set(1, 0.85, 1.1); // snout
+  add(head, new THREE.SphereGeometry(0.02, 6, 6), dark, 0, -0.03, 0.27, 0);
+  for (const x of [-1, 1]) {
+    add(head, new THREE.SphereGeometry(0.03, 8, 8), MAT(0x101010), x * 0.1, 0.05, 0.12, 0);   // eyes
+    const ear = add(head, new THREE.ConeGeometry(0.045, 0.2, 8), wool, x * 0.09, 0.2, -0.02); ear.rotation.z = -x * 0.25;
+  }
+  add(head, new THREE.SphereGeometry(0.13, 10, 8), wool, 0, 0.14, -0.04, 0).scale.set(1, 0.6, 1); // top fluff
+  const legs = [];
+  for (const [x, z] of [[-0.17, 0.36], [0.17, 0.36], [-0.17, -0.36], [0.17, -0.36]]) {
+    const leg = new THREE.Group(); leg.position.set(x, 0.78, z); m.add(leg);
+    add(leg, cap(0.1, 0.25), wool, 0, -0.18, 0);
+    add(leg, cap(0.065, 0.35), wool, 0, -0.5, 0);
+    add(leg, new THREE.BoxGeometry(0.12, 0.08, 0.16), dark, 0, -0.74, 0.02);
+    legs.push(leg);
+  }
+  Object.assign(rig, { mount: m, mTorso: torso, mNeck: neck, mLegs: legs, ride: SADDLE, rideOff: SADDLE, mGround: null, mPhase: 0, air: 0, sault: 0, flipping: false, djSeen: false });
+}
+
+/** Per-frame mount animation. f = the fighter, y = its interpolated height (rig.root.position.y). */
+export function updateMount(rig, f, y, dt) {
+  if (!rig.mount) return;
+  const k = 1 - Math.pow(0.8, Math.min(dt, 0.05) * 60);
+  const airborne = !f.grounded, thrown = f.state === 'down';
+  if (rig.mGround === null || !airborne) rig.mGround = y;
+  rig.mGround = Math.min(rig.mGround, y);                       // fell off a ledge: the alpaca falls too
+  rig.mount.position.y = rig.mGround - y;                       // stays on the ground under the rider
+  // flip off the saddle on every jump (and again on a double jump)
+  if (airborne && f.state === 'air') {
+    if (!rig.flipping && (rig.air === 0 || (f.djUsed && !rig.djSeen))) { rig.flipping = true; rig.sault = 0; }
+    rig.djSeen = !!f.djUsed; rig.air += dt;
+  } else { rig.air = 0; rig.djSeen = false; }
+  if (rig.flipping) { rig.sault += dt / 0.55; if (rig.sault >= 1 || thrown || !airborne) { rig.flipping = false; rig.sault = 0; } }
+  rig.rideOff += ((thrown ? 0 : rig.ride) - rig.rideOff) * k;
+  // alpaca trots when moving, bobs when idle
+  const speed = Math.abs(f.x - (f.px ?? f.x)) * 60, run = Math.min(1, speed / 4);
+  rig.mPhase += dt * (4 + speed * 2.2);
+  const s = Math.sin(rig.mPhase * 2.2) * 0.6 * run;
+  rig.mLegs.forEach((l, i) => (l.rotation.x = (i === 0 || i === 3 ? s : -s)));
+  rig.mTorso.position.y = 0.92 + Math.abs(Math.sin(rig.mPhase * 2.2)) * 0.05 * run + Math.sin(rig.mPhase) * 0.01;
+  rig.mNeck.rotation.x = 0.18 + run * 0.25 + (f.state === 'attack' ? 0.2 : 0);
 }
 
 /* ---- photo faces: a flat 2D head cutout (billboard) that always faces the camera and flips when the fighter turns ---- */
@@ -204,7 +262,20 @@ export function applyPose(rig, name, u = 0, k = 0.4, look = 0) {
   rig.legs[0].rotation.set(c.lL, 0, c.lLz); rig.legs[1].rotation.set(c.lR, 0, c.lRz);
   rig.knees[0].rotation.x = c.lLk; rig.knees[1].rotation.x = c.lRk;
   rig.torso.rotation.x = c.lean; rig.head.rotation.x = c.headX - c.lean * 0.5; rig.head.rotation.y = look;
-  rig.body.position.y = c.drop + 0.22 * c.fall; rig.body.rotation.x = -1.5 * c.fall;
+  rig.body.position.y = c.drop + 0.22 * c.fall; rig.body.rotation.x = -1.5 * c.fall; rig.body.position.z = 0;
+  if (rig.mount) { // riding: straddle the saddle (kicks still kick), and flip through the air on jumps
+    const kick = name === 'lk' || name === 'hk' || name === 'sweep' || name === 'jk';
+    if (c.fall < 0.3 && !rig.flipping) {
+      if (!kick) { rig.legs[0].rotation.set(-1.25, 0, 0.55); rig.legs[1].rotation.set(-1.25, 0, -0.55); rig.knees[0].rotation.x = 1.35; rig.knees[1].rotation.x = 1.35; }
+      rig.body.position.y = Math.max(-0.12, c.drop * 0.3);
+    }
+    rig.body.position.y += rig.rideOff;
+    if (rig.flipping) { // tucked forward somersault around the hips
+      const t = rig.sault, th = t * Math.PI * 2, cy = 1.0;
+      rig.legs.forEach((l) => l.rotation.set(-1.6, 0, 0)); rig.knees.forEach((n) => (n.rotation.x = 2.1));
+      rig.body.rotation.x = th; rig.body.position.y += cy - cy * Math.cos(th) + Math.sin(t * Math.PI) * 0.5; rig.body.position.z = -cy * Math.sin(th);
+    }
+  }
 }
 
 export { MAT as toonMat, OUTLINE };

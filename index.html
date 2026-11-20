@@ -192,7 +192,7 @@ body.paused #touch,body.paused #pauseBtn,body.paused #fsBtn{display:none}
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="src/game.js?v=28"></script>
+<script type="module" src="src/game.js?v=29"></script>
 <script>
 // pause button visible only while fighting
 new MutationObserver(()=>{document.body.classList.toggle('paused',!document.getElementById('pause').classList.contains('hidden'))}).observe(document.getElementById('pause'),{attributes:true});
