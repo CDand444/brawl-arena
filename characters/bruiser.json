@@ -42,6 +42,13 @@
  },
  "ultimate": {
   "name": "Rise And Grind",
-  "color": "#ffb02a"
+  "color": "#ffb02a",
+  "summon": {
+   "id": "auburn",
+   "chance": 0.5,
+   "seconds": 10,
+   "power": 0.7,
+   "label": "White Chocolate"
+  }
  }
 }

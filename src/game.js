@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=11';
-import { loadFaces, canDecrypt } from './faces.js?v=11';
-import { Fighter, MOVES } from './fighter.js?v=11';
-import { makeAI } from './ai.js?v=11';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=11';
-import { Net, packInput, unpackInput } from './net.js?v=11';
-import { buildStage, MAPS } from './stage.js?v=11';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=12';
+import { loadFaces, canDecrypt } from './faces.js?v=12';
+import { Fighter, MOVES } from './fighter.js?v=12';
+import { makeAI } from './ai.js?v=12';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=12';
+import { Net, packInput, unpackInput } from './net.js?v=12';
+import { buildStage, MAPS } from './stage.js?v=12';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -156,10 +156,10 @@ const BOUNDS = 5.2, game = { bounds: BOUNDS };
 const coarse = matchMedia('(pointer:coarse)').matches;
 setupTouch();
 
-function clearFighters() { fighters.forEach((f) => scene.remove(f.rig.root)); fighters = []; projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = []; }
+function clearFighters() { clearHelpers(); fighters.forEach((f) => scene.remove(f.rig.root)); fighters = []; projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = []; }
 
 function startMatch() {
-  show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters(); if (mode !== 'online') stage.setMap(resolveMap());
+  show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters(); rngSeed = 0x9e3779b9; if (mode !== 'online') stage.setMap(resolveMap());
   const kb1 = mode === 'ai' ? combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput()) : keyboardInput(KEYMAPS.p1);
   fighters = [
     new Fighter(picks[0], makeRig(picks[0]), 0, kb1),
@@ -188,7 +188,7 @@ $('tips').onclick = () => show('tips', false);
 $('tipsBtn').onclick = () => showTips($('tips').classList.contains('hidden'));
 
 function newRound() {
-  hitstop = 0;
+  hitstop = 0; clearHelpers();
   projectiles.forEach((p) => scene.remove(p.mesh)); projectiles = [];
   fighters[0].reset(-2); fighters[1].reset(2);
   timer = 99 * 60; phase = 'intro'; pt = 0; banner(`ROUND ${round}`);
@@ -198,6 +198,44 @@ function banner(t, sub = '') { $('banner').innerHTML = t + (sub ? `<small>${sub}
 
 // Ranged special types (set per character in JSON: special.type): fireball = mid height (duck it), low = ground wave (jump it), fast = quick shot
 const SPECIALS = { fireball: { py: 1.35, speed: 0.12, dmg: 10, size: 0.28 }, low: { py: 0.45, speed: 0.14, dmg: 8, size: 0.3, low: true }, fast: { py: 1.35, speed: 0.2, dmg: 7, size: 0.22 } };
+/* ---- summoned backup (e.g. Tha Motivator's Ultimate): a scripted ghost ally that fights for a while. Part of the sim, so everything here is deterministic. ---- */
+let rngSeed = 0x9e3779b9;
+game.rand = () => { rngSeed = (rngSeed + 0x6D2B79F5) | 0; let t = Math.imul(rngSeed ^ (rngSeed >>> 15), 1 | rngSeed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; // mulberry32: same sequence on both machines
+let helpers = [];
+function makeHelperInput(h, owner) {
+  const seq = [['lp'], ['lp'], ['hp'], ['lk'], ['hk'], ['d', 'lk'], ['lp'], ['hp'], ['d', 'hp']];
+  let i = 0, cool = 15, hold = 0, press = null;
+  return () => {
+    const o = EMPTY(), opp = fighters[1 - owner.side], dx = Math.abs(opp.x - h.x), fwd = h.face > 0 ? 'r' : 'l';
+    if (hold > 0) { hold--; if (press) for (const k of press) o[k] = 1; return o; }
+    if (cool > 0) cool--;
+    if (dx > 1.45) { o[fwd] = 1; if (dx > 3) o.run = 1; if (dx > 3.4 && cool === 0 && h.fbCooldown === 0) { press = ['sp']; hold = 2; cool = 40; } }
+    else if (cool === 0) { press = seq[i++ % seq.length]; hold = 2; cool = 12 + (press.length > 1 ? 14 : 8); }
+    return o;
+  };
+}
+function ghostify(rig) {
+  rig.root.traverse((o) => { if (o.isMesh && o.material && o.material.side !== THREE.BackSide) { o.material = o.material.clone(); o.material.transparent = true; o.material.opacity = 0.8; } });
+  const glow = stage.glow(0x9ad8ff, 2.6); glow.position.y = 0.15; rig.root.add(glow);
+}
+function removeHelper(h) { stage.spark(h.f.x, 1, 14, 0x9ad8ff, 0.9); scene.remove(h.f.rig.root); }
+function clearHelpers() { helpers.forEach(removeHelper); helpers = []; }
+function updateHelpers() {
+  for (const h of helpers) { h.f.update(fighters[1 - h.owner.side], game); h.life--; }
+  helpers.filter((h) => h.life <= 0).forEach(removeHelper); helpers = helpers.filter((h) => h.life > 0);
+}
+function trySummon(f) { // returns the helper's label if she showed up
+  const cfg = f.def.ultimate?.summon; if (!cfg) return null;
+  if (game.rand() >= (cfg.chance ?? 0.5)) return null; // always draw one number so both machines stay in step
+  const def = defs.find((d) => d.id === cfg.id); if (!def) return null;
+  helpers = helpers.filter((h) => { if (h.owner === f) { removeHelper(h); return false; } return true; });
+  const hf = new Fighter(def, makeRig(def), f.side, null);
+  hf.getInput = makeHelperInput(hf, f); hf.power = cfg.power ?? 0.7; hf.inv = 999999; hf.x = f.x - f.face * 0.9; hf.face = f.face;
+  ghostify(hf.rig); scene.add(hf.rig.root);
+  const label = cfg.label || def.name; helpers.push({ f: hf, owner: f, life: Math.round((cfg.seconds ?? 10) * 60), label });
+  stage.spark(hf.x, 1, 24, 0x9ad8ff, 1.2);
+  return label.toUpperCase();
+}
 let ultT = 0, hitstop = 0; // hitstop = freeze-frames on impact (part of the sim, so identical on both machines online)
 game.onDJ = (f) => { stage.spark(f.x, f.y + 0.15, 8, 0xffffff, 0.6); sfx(520, 0.08, 'triangle', 0.04); }; // cosmetic
 game.spawnProjectile = (f, kind = 'fb') => {
@@ -211,8 +249,9 @@ game.spawnProjectile = (f, kind = 'fb') => {
   if (!ult) f.fbCooldown = 50;
   sfx(ult ? 150 : 300, ult ? 0.5 : 0.2, 'sawtooth', ult ? 0.12 : 0.05);
 };
-game.onUlt = (f) => { // cosmetic only (must not touch sim state)
-  ultT = 70; banner((f.def.ultimate?.name || 'ULTIMATE').toUpperCase() + '!'); stage.shake += 0.7; sfx(80, 0.6, 'sawtooth', 0.12);
+game.onUlt = (f) => { // mostly cosmetic; the optional summon is part of the sim (seeded RNG)
+  const summoned = trySummon(f);
+  ultT = 70; banner((f.def.ultimate?.name || 'ULTIMATE').toUpperCase() + '!', summoned ? summoned + ' SHOWS UP TO HELP!' : ''); stage.shake += 0.7; sfx(80, 0.6, 'sawtooth', 0.12);
   const el = $('flash'); el.style.transition = 'none'; el.style.opacity = 0.85; requestAnimationFrame(() => { el.style.transition = 'opacity .7s'; el.style.opacity = 0; });
 };
 game.tryHit = (att, def, m) => {
@@ -241,7 +280,7 @@ function step60() {
   const none = EMPTY();
   const [a, b] = fighters;
   if (ultT > 0 && --ultT === 0 && phase === 'fight') banner('');
-  if (phase === 'fight') { if (hitstop > 0) { hitstop--; a.poll(); b.poll(); } else { timer--; a.update(b, game); b.update(a, game); } }
+  if (phase === 'fight') { if (hitstop > 0) { hitstop--; a.poll(); b.poll(); } else { timer--; a.update(b, game); b.update(a, game); updateHelpers(); } }
   else { a.update(b, game, none); b.update(a, game, none); }
   // separation
   if (a.grounded && b.grounded && Math.abs(a.x - b.x) < 0.7) {
@@ -252,7 +291,7 @@ function step60() {
   for (const p of projectiles) {
     p.x += p.dir * p.speed; p.mesh.position.x = p.x;
     if (Math.random() < (p.ult ? 1 : 0.6)) stage.spark(p.x - p.dir * 0.3, p.py + (Math.random() - 0.5) * (p.ult ? 1.2 : 0), p.ult ? 2 : 1, p.color, p.ult ? 0.9 : 0.5); // cosmetic only
-    const t = p.owner === a ? b : a, top = t.y + (t.crouching ? 1.25 : 1.95);
+    const t = fighters[1 - p.owner.side], top = t.y + (t.crouching ? 1.25 : 1.95);
     if (phase === 'fight' && Math.abs(p.x - t.x) < 0.45 + (p.ult ? 0.3 : 0) && p.py + p.hh >= t.y && p.py - p.hh <= top && t.inv === 0 && t.state !== 'down' && t.state !== 'getup') {
       p.dead = true; stage.spark(p.x, p.py, p.ult ? 40 : 22, p.ult ? 0xffffff : 0xff9a3a, p.ult ? 2 : 1.4); stage.shake += p.ult ? 1 : 0.5;
       hitstop = Math.max(hitstop, p.ult ? 8 : 4);
@@ -261,7 +300,7 @@ function step60() {
     if (Math.abs(p.x) > 12) p.dead = true;
   }
   projectiles = projectiles.filter((p) => { if (p.dead) scene.remove(p.mesh); return !p.dead; });
-  fighters.forEach(poseUpdate);
+  fighters.forEach(poseUpdate); helpers.forEach((h) => poseUpdate(h.f));
 
   // combo + HUD
   const hits = Math.max(a.comboHits, b.comboHits);
@@ -280,6 +319,7 @@ function step60() {
 }
 let matchWinner = -1;
 function endRound(w, timeUp) {
+  clearHelpers();
   phase = 'end'; pt = 0;
   if (w >= 0) wins[w]++;
   matchWinner = wins[0] >= 2 ? 0 : wins[1] >= 2 ? 1 : -1;
@@ -324,6 +364,7 @@ function loop(now) {
       $('hp0').style.width = Math.max(0, (a.hp / a.maxHp) * 100) + '%';
       $('hp1').style.width = Math.max(0, (b.hp / b.maxHp) * 100) + '%';
       [a, b].forEach((f, i) => { $('m' + i).style.width = Math.min(100, f.meter) + '%'; $('m' + i).parentElement.classList.toggle('full', f.meter >= 100); });
+      $('backup').textContent = helpers.map((h) => `${h.label} · ${Math.ceil(h.life / 60)}s`).join('   '); $('backup').classList.toggle('hidden', !helpers.length);
       $('timer').textContent = Math.max(0, Math.ceil(timer / 60));
     }
   }
@@ -337,7 +378,7 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-const V = 11;
+const V = 12;
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [
   `<div class="adh">GAMER ALERT!!</div><div class="ps3"><div class="slab"><i></i>PS3</div></div><div class="adt">PS3: "barely used, only played on weekends"</div><div class="adp">$49 OBO · controller sold separately · yes, it still plays Blu-ray</div><button>BUY NOW (not real)</button>`,

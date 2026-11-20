@@ -35,6 +35,13 @@
  },
  "ultimate": {
   "name": "Dinner Table Talk",
-  "color": "#ffd02a"
+  "color": "#ffd02a",
+  "summon": {
+   "id": "crimson",
+   "chance": 0.5,
+   "seconds": 10,
+   "power": 0.7,
+   "label": "The Politician"
+  }
  }
 }

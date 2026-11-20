@@ -45,6 +45,10 @@ smooth walk acceleration, air steering + fast-fall (hold down), impact freeze-fr
   with armor while charging. Name/color from `ultimate` in JSON. On touch screens: SPECIAL and ULT buttons.
 - A floating how-to-fight card shows when a match starts (click to close, `?` button reopens it).
 
+### Summons
+An `ultimate` can carry `"summon": {"id":"<character id>","chance":0.5,"seconds":10,"power":0.7,"label":"..."}`: when the Ultimate is cast there is that chance a scripted, untouchable
+ghost ally (the other character) fights alongside for that long. Tha Motivator summons White Chocolate; Black Son In Law summons The Politician. Rolls use the shared seeded RNG (`game.rand`) so online matches stay in sync.
+
 ## Photo faces (private)
 A character can wear a real face: `"face": {"src":"faces/<id>.enc","crop":[x,y,w,h],"bright":1,"match":0}` in its JSON.
 - Photos are stored **AES-256 encrypted** in `faces/` (public repo never holds a readable photo). The game asks for the group password once
