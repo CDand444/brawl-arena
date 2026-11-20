@@ -52,6 +52,7 @@ Low shots hit crates, high ones fly over. The CPU grabs and throws too.
 
 ## Special moves
 - **Ranged special** (P1 `E` / P2 `P`, or down, down-forward, forward + punch): per character via `special.type` in JSON: `fireball` (mid height: duck it), `low` (ground wave: jump it), `fast` (quick, weaker).
+- **SUPER bar:** fills only from normal attacks, thrown items and taking damage. A ranged special costs 25 of it, an Ultimate costs all 100, and hits from specials/Ultimates never refill the attacker's bar.
 - **Ultimate** (P1 `R` / P2 `;`, or down, down-forward, forward + HK): needs a full blue SUPER bar (fills by hitting and being hit). Fast, unblockable, 30 damage,
   with armor while charging. Name/color from `ultimate` in JSON. On touch screens: SPECIAL and ULT buttons.
 - Controls live in the pause menu (Esc or the pause button). Online it overlays the running match.

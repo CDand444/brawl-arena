@@ -16,6 +16,7 @@ export const MOVES = {
   throw: { s: 6, a: 0, r: 12, dmg: 0, pose: 'fireball', thrown: true }, // throwing a held item (see props in game.js)
 };
 
+export const SPECIAL_COST = 25; // a ranged special spends a quarter of the SUPER bar; an Ultimate spends all of it
 const BUFFER = 7;        // ticks a button press is remembered, so near-simultaneous inputs still register
 const MAX_CHAIN = 3;     // cancels allowed per string
 const PRESS = ['lp', 'hp', 'lk', 'hk', 'sp'];
@@ -74,7 +75,7 @@ export class Fighter {
   chooseAttack(ep, inp, special = true) {
     if (special) {
       if (this.meter >= 100 && (ep.ult || (ep.hk && this.hasQCF()))) return 'ult';
-      if ((ep.lp || ep.hp || ep.sp) && this.fbCooldown === 0 && (ep.sp || this.hasQCF())) return 'fb';
+      if ((ep.lp || ep.hp || ep.sp) && this.fbCooldown === 0 && this.meter >= SPECIAL_COST && (ep.sp || this.hasQCF())) return 'fb';
     }
     if (ep.hp && inp.d) return 'up';
     if (ep.lk && inp.d) return 'sweep';
@@ -111,7 +112,7 @@ export class Fighter {
         if (atk) {
           this.startAttack(atk);
           if (atk === 'ult') { this.meter = 0; this.hist.length = 0; if (game.onUlt) game.onUlt(this); }
-          if (atk === 'fb') this.hist.length = 0;
+          if (atk === 'fb') { this.hist.length = 0; this.meter -= SPECIAL_COST; }
           break;
         }
         if (inp.u && !inp.d) { // jump, keeping run/walk momentum
@@ -140,7 +141,7 @@ export class Fighter {
         // chain cancel: once a light move has connected, cancel into a different normal / special
         if (m.chain && this.hitDone && this.t > m.s && this.chain < MAX_CHAIN) {
           const nxt = this.chooseAttack(ep, inp, true);
-          if (nxt && nxt !== this.moveName && nxt !== 'ult') { this.startAttack(nxt, true); if (nxt === 'fb') this.hist.length = 0; break; }
+          if (nxt && nxt !== this.moveName && nxt !== 'ult') { this.startAttack(nxt, true); if (nxt === 'fb') { this.hist.length = 0; this.meter -= SPECIAL_COST; } break; }
         }
         if (this.t >= m.s + (m.a || 0) + m.r) this.state = 'idle';
         break;
@@ -178,13 +179,13 @@ export class Fighter {
     const kbDir = att.face;
     if (blocking) {
       this.hp -= m.dmg * 0.08 * att.power;
-      this.meter = Math.min(100, this.meter + m.dmg * 0.45); att.meter = Math.min(100, att.meter + m.dmg * 0.3);
+      this.meter = Math.min(100, this.meter + m.dmg * 0.45); if (!m.noMeter) att.meter = Math.min(100, att.meter + m.dmg * 0.3);
       this.state = 'blockstun'; this.t = 0; this.stun = m.bs; this.vx = kbDir * (m.kb + 0.05);
       return 'block';
     }
     let scale = 1; for (let i = 0; i < this.comboHits; i++) scale *= 0.88; // no Math.pow: must be bit-identical across browsers (online lockstep)
     const dmg = m.dmg * att.power * scale;
-    this.meter = Math.min(100, this.meter + dmg * 1.2); att.meter = Math.min(100, att.meter + dmg * 1.8); // x1.5 because health is doubled: Ultimates stay as frequent as before
+    this.meter = Math.min(100, this.meter + dmg * 1.2); if (!m.noMeter) att.meter = Math.min(100, att.meter + dmg * 1.8); // specials/Ultimates never refill the attacker's bar // x1.5 because health is doubled: Ultimates stay as frequent as before
     if (this.state === 'attack' && this.move.projectile === 'ult' && this.t <= this.move.s && this.hp - dmg * 0.5 > 0) { // super armor while charging an Ultimate
       this.hp -= dmg * 0.5; this.comboHits++; return 'hit';
     }

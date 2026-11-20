@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=24';
-import { loadFaces, canDecrypt, normalize } from './faces.js?v=24';
-import { Fighter, MOVES } from './fighter.js?v=24';
-import { makeAI } from './ai.js?v=24';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=24';
-import { Net, Lobby, packInput, unpackInput } from './net.js?v=24';
-import { buildStage, MAPS } from './stage.js?v=24';
+import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=25';
+import { loadFaces, canDecrypt, normalize } from './faces.js?v=25';
+import { Fighter, MOVES } from './fighter.js?v=25';
+import { makeAI } from './ai.js?v=25';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=25';
+import { Net, Lobby, packInput, unpackInput } from './net.js?v=25';
+import { buildStage, MAPS } from './stage.js?v=25';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -245,9 +245,9 @@ function startMatch() {
 }
 function tipsHtml() {
   const k = (a, b) => `<b>${a}</b> ${b}`;
-  if (coarse) return `<h4>CONTROLS</h4>Pad (left): move, up = jump (tap up again in the air = double jump), down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('GRAB', 'pick up / throw items')} · ${k('SPECIAL', 'ranged shot')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
+  if (coarse) return `<h4>CONTROLS</h4>Pad (left): move, up = jump (tap up again in the air = double jump), down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('GRAB', 'pick up / throw items')} · ${k('SPECIAL', 'ranged shot, costs 1/4 bar')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
   const p2 = mode === '2p' ? `<br><b>P2:</b> arrows move · U/I punch · J/K kick · L block · O run · <b>P</b> special · <b>;</b> ultimate · <b>/</b> grab/throw` : '';
-  return `<h4>CONTROLS</h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('Q', 'grab / throw items')} <small>(smash crates + barrels: barrels explode!)</small><br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = this menu.<br>Gamepad: X/Y punch · A/B kick · RB block · LT run · LB grab · RT special · stick click ultimate · Start pause.</small>`;
+  return `<h4>CONTROLS</h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('Q', 'grab / throw items')} <small>(smash crates + barrels: barrels explode!)</small><br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G; costs 1/4 of the SUPER bar)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = this menu.<br>Gamepad: X/Y punch · A/B kick · RB block · LT run · LB grab · RT special · stick click ultimate · Start pause.</small>`;
 }
 
 function newRound() {
@@ -513,7 +513,7 @@ function step60() {
     if (phase === 'fight' && Math.abs(p.x - t.x) < 0.45 + (p.ult ? 0.3 : 0) && p.py + p.hh >= t.y && p.py - p.hh <= top && t.inv === 0 && t.state !== 'down' && t.state !== 'getup') {
       p.dead = true; stage.spark(p.x, p.py, p.ult ? 40 : 22, p.ult ? 0xffffff : 0xff9a3a, p.ult ? 2 : 1.4); stage.shake += p.ult ? 1 : 0.5;
       hitstop = Math.max(hitstop, p.ult ? 8 : 4);
-      t.receive(p.owner, { dmg: p.dmg, kb: p.ult ? 0.2 : 0.1, hs: 22, bs: 14, knock: true, low: p.low, unblockable: p.unblockable }, game); sfx(160, 0.15, 'sawtooth', 0.09);
+      t.receive(p.owner, { dmg: p.dmg, kb: p.ult ? 0.2 : 0.1, hs: 22, bs: 14, knock: true, low: p.low, unblockable: p.unblockable, noMeter: true }, game); sfx(160, 0.15, 'sawtooth', 0.09);
     }
     if (Math.abs(p.x) > BOUNDS + 6) p.dead = true;
   }
@@ -620,7 +620,7 @@ let padWas = false;
 setInterval(() => { const s = padStart(); if (s && !padWas) { if (!$('pause').classList.contains('hidden')) closePause(); else openPause(); } padWas = s; }, 100);
 $('pauseBtn').onclick = openPause;
 
-const V = 24;
+const V = 25;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [
