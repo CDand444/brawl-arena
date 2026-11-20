@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=22';
-import { loadFaces, canDecrypt, normalize } from './faces.js?v=22';
-import { Fighter, MOVES } from './fighter.js?v=22';
-import { makeAI } from './ai.js?v=22';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=22';
-import { Net, Lobby, packInput, unpackInput } from './net.js?v=22';
-import { buildStage, MAPS } from './stage.js?v=22';
+import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=24';
+import { loadFaces, canDecrypt, normalize } from './faces.js?v=24';
+import { Fighter, MOVES } from './fighter.js?v=24';
+import { makeAI } from './ai.js?v=24';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=24';
+import { Net, Lobby, packInput, unpackInput } from './net.js?v=24';
+import { buildStage, MAPS } from './stage.js?v=24';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -36,9 +36,10 @@ function frameCamera(cx, spread, k = 1, minHalf = 3.4) {
 cam.position.set(0, 1.5, 12);
 
 /* ---------- audio (tiny synth, no assets) ---------- */
+let muted = false; try { muted = localStorage.getItem('brawl-mute') === '1'; } catch (e) {}
 let actx, simMode = false; // simMode: balance testing (no sound, no rig prewarm)
 const sfx = (f, d = 0.08, type = 'square', v = 0.05) => {
-  if (simMode) return;
+  if (simMode || muted) return;
   try { actx = actx || new (window.AudioContext || window.webkitAudioContext)();
     const o = actx.createOscillator(), g = actx.createGain(); o.type = type; o.frequency.value = f;
     g.gain.value = v; g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + d);
@@ -76,6 +77,11 @@ function buildSelect() {
 function choose(d) {
   if (mode === 'online') { myPick = d; const mp = resolveMap(); if (localSlot === 0) stage.setMap(mp); net.send({ t: 'pick', id: d.id, map: mp }); setPreview(0, d); $('selTitle').textContent = 'Waiting for opponent to choose…'; tryStartOnline(); return; }
   picks[step] = d;
+  if (arcade) { // fight everyone else, in random order, getting harder
+    const rest = defs.filter((x) => x.id !== d.id);
+    for (let i = rest.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [rest[i], rest[j]] = [rest[j], rest[i]]; }
+    arcade = { order: rest, idx: 0 }; arcadeNext(); return;
+  }
   if (step === 0) { step = 1; $('selTitle').textContent = mode === 'ai' ? 'Choose your opponent' : 'Player 2: choose your fighter'; setPreview(1, null); }
   else startMatch();
 }
@@ -92,17 +98,29 @@ function pickMap(id) {
 }
 function openSelect() {
   show('menu', false); show('select'); show('hud', false); show('touch', false); show('endbar', false);
-  step = 0; picks = []; $('selTitle').textContent = mode === 'p2' ? 'Player 1: choose your fighter' : 'Choose your fighter';
+  step = 0; picks = []; $('selTitle').textContent = mode === '2p' ? 'Player 1: choose your fighter' : arcade ? 'ARCADE: choose your fighter' : 'Choose your fighter';
   $('randBtn').classList.toggle('hidden', false);
   buildMapChips(); $('maps').classList.toggle('hidden', mode === 'online' && localSlot === 1);
   ['banner', 'fsBtn', 'ad', 'pause', 'rotate'].forEach((i) => show(i, false)); paused = false; $('combo').textContent = '';
   setPreview(0, null); setPreview(1, null); previewRoot.visible = true; clearFighters(); phase = 'menu';
 }
-$('btn1p').onclick = () => { mode = 'ai'; openSelect(); };
-$('btn2p').onclick = () => { mode = '2p'; openSelect(); };
+let arcade = null;
+function arcadeNext() { const n = arcade.order.length, i = arcade.idx; picks[1] = arcade.order[i]; diff = i < n / 3 ? 0 : i < (2 * n) / 3 ? 1 : 2; startMatch(); }
+function onMatchOver() { // label the end-of-match buttons
+  const b = $('rematch'); b.textContent = 'REMATCH';
+  if (!arcade) return;
+  const n = arcade.order.length;
+  if (matchWinner !== 0) b.textContent = 'RETRY';
+  else if (arcade.idx + 1 < n) b.textContent = `NEXT FIGHT (${arcade.idx + 2}/${n})`;
+  else { banner('ARCADE CLEARED!', `${picks[0].name} beat everyone`); b.textContent = 'PLAY AGAIN'; }
+}
+$('btnArcade').onclick = () => { mode = 'ai'; arcade = { order: [], idx: 0 }; openSelect(); };
+$('btn1p').onclick = () => { mode = 'ai'; arcade = null; diff = +$('diff').value; openSelect(); };
+$('btn2p').onclick = () => { mode = '2p'; arcade = null; openSelect(); };
 $('randBtn').onclick = () => choose(defs[(Math.random() * defs.length) | 0]);
 $('diff').onchange = (e) => (diff = +e.target.value);
 function goMenu() {
+  arcade = null; diff = +$('diff').value;
   stopLobby();
   if (mode === 'online') { net.close(); net = new Net(); }
   mode = 'ai'; phase = 'menu'; clearFighters(); previewRoot.visible = true; setPreview(0, null); setPreview(1, null); paused = false;
@@ -110,6 +128,7 @@ function goMenu() {
 }
 $('btnMenu').onclick = $('menuBtn2').onclick = goMenu;
 $('rematch').onclick = () => {
+  if (arcade && phase === 'over' && matchWinner === 0) { arcade.idx = (arcade.idx + 1) % arcade.order.length; if (arcade.idx === 0) return changeFighter(); return arcadeNext(); }
   if (mode !== 'online') return startMatch();
   myRematch = true; net.send({ t: 'rematch' }); $('rematch').textContent = 'WAITING…'; tryRematch();
 };
@@ -125,8 +144,8 @@ $('pChange').onclick = () => { paused = false; show('pause', false); changeFight
 /* ---------- online (lockstep: both browsers run the same deterministic sim, only inputs are exchanged) ---------- */
 const DELAY = 4; // input delay in ticks (~67ms); higher = smoother on bad connections
 let net = new Net(), localSlot = 0, myPick = null, theirPick = null, myRematch = false, theirRematch = false;
-let simTick = 0, localBuf = {}, remoteBuf = {};
-const sampleLocal = combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput());
+let simTick = 0, localBuf = {}, remoteBuf = {}, epoch = 0, future = {};
+const sampleLocal = combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput(), gamepadInput(0));
 const setStatus = (t) => ($('onStatus').textContent = t);
 let lobby = null, lobbyTok = 0, hostingCode = null;
 async function groupId() { // lobbies are private to everyone who has the same password; others share a public lobby
@@ -148,6 +167,7 @@ async function startLobby() {
 }
 function stopLobby() { lobbyTok++; if (lobby) { lobby.stop(); lobby = null; } hostingCode = null; }
 $('btnOnline').onclick = () => {
+  arcade = null;
   show('menu', false); show('online'); setStatus(''); show('hostBtn'); show('cancelHost', false);
   try { $('pname').value = localStorage.getItem('brawl-name') || ''; } catch (e) {}
   startLobby();
@@ -156,7 +176,7 @@ $('onBack').onclick = () => { stopLobby(); net.close(); net = new Net(); show('o
 $('cancelHost').onclick = () => { net.close(); net = new Net(); hostingCode = null; if (lobby) lobby.setRoom(null); show('cancelHost', false); show('hostBtn'); setStatus(''); };
 function wireNet() {
   net.onmsg = (m) => {
-    if (m.t === 'in') remoteBuf[m.k] = unpackInput(m.v);
+    if (m.t === 'in') { if (m.e === epoch) remoteBuf[m.k] = unpackInput(m.v); else if (m.e > epoch) (future[m.e] = future[m.e] || {})[m.k] = unpackInput(m.v); }
     else if (m.t === 'pick') { theirPick = defs.find((d) => d.id === m.id) || null; if (m.map && localSlot === 1) stage.setMap(m.map); tryStartOnline(); }
     else if (m.t === 'rematch') { theirRematch = true; tryRematch(); }
     else if (m.t === 'reselect') { myPick = theirPick = null; myRematch = theirRematch = false; $('rematch').textContent = 'REMATCH'; openSelect(); toast('Your opponent is picking a new fighter'); }
@@ -168,7 +188,7 @@ function wireNet() {
 }
 function beginOnline(slot) {
   stopLobby();
-  mode = 'online'; localSlot = slot; myPick = theirPick = null; myRematch = theirRematch = false; wireNet();
+  mode = 'online'; epoch = 0; future = {}; localSlot = slot; myPick = theirPick = null; myRematch = theirRematch = false; wireNet();
   show('online', false); openSelect(); mode = 'online'; // openSelect resets title; keep mode
   $('selTitle').textContent = `Choose your fighter (you are ${slot ? 'Player 2, right' : 'Player 1, left'})`;
 }
@@ -206,28 +226,28 @@ function clearFighters() { clearProps(); cutT = 0; cut = null; show('cut', false
 
 function startMatch() {
   show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters(); rngSeed = 0x9e3779b9; if (mode !== 'online') stage.setMap(resolveMap());
-  const kb1 = mode === 'ai' ? combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput()) : keyboardInput(KEYMAPS.p1);
+  const kb1 = mode === 'ai' ? combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput(), gamepadInput(0)) : combine(keyboardInput(KEYMAPS.p1), gamepadInput(0));
   fighters = [
     new Fighter(picks[0], makeRig(picks[0]), 0, kb1),
-    new Fighter(picks[1], makeRig(picks[1]), 1, mode === 'p2' ? keyboardInput(KEYMAPS.p2) : null),
+    new Fighter(picks[1], makeRig(picks[1]), 1, mode === '2p' ? combine(keyboardInput(KEYMAPS.p2), gamepadInput(1)) : null),
   ];
   if (mode === 'ai') fighters[1].getInput = makeAI(fighters[1], fighters[0], diff);
   if (mode === 'online') { // each tick's inputs come from the exchanged buffers
-    simTick = 0; localBuf = {}; remoteBuf = {}; acc = 0;
+    epoch++; simTick = 0; localBuf = {}; remoteBuf = future[epoch] || {}; delete future[epoch]; acc = 0;
     for (let t = 0; t < DELAY; t++) { localBuf[t] = EMPTY(); remoteBuf[t] = EMPTY(); }
     fighters.forEach((f, i) => (f.getInput = () => (i === localSlot ? localBuf : remoteBuf)[simTick] || EMPTY()));
   }
   fighters.forEach((f) => { f.rig.root.traverse((o) => { if (o.isMesh) o.castShadow = true; }); scene.add(f.rig.root); });
-  $('n0').textContent = picks[0].name; $('n1').textContent = mode === 'ai' ? picks[1].name + ' (CPU)' : picks[1].name;
+  $('n0').textContent = picks[0].name; $('n1').textContent = arcade ? `${picks[1].name} (${arcade.idx + 1}/${arcade.order.length})` : mode === 'ai' ? picks[1].name + ' (CPU)' : picks[1].name;
   wins = [0, 0]; round = 1; flawless = [true, true];
-  show('hud'); show('touch', coarse && mode !== 'p2'); show('rematch'); $('rematch').textContent = 'REMATCH'; paused = false; show('pause', false);
+  show('hud'); show('touch', coarse && mode !== '2p'); show('rematch'); $('rematch').textContent = 'REMATCH'; paused = false; show('pause', false);
   prewarmHelpers(); scheduleAds(); newRound(); show('fsBtn'); maybeRotateHint();
 }
 function tipsHtml() {
   const k = (a, b) => `<b>${a}</b> ${b}`;
   if (coarse) return `<h4>CONTROLS</h4>Pad (left): move, up = jump (tap up again in the air = double jump), down = crouch<br>${k('LP/HP', 'punch')} · ${k('LK/HK', 'kick')} · ${k('BLOCK', 'guard')} · ${k('RUN', '+ forward')}<br>${k('down + HP', 'uppercut')} · ${k('down + LK', 'sweep')}<br>${k('GRAB', 'pick up / throw items')} · ${k('SPECIAL', 'ranged shot')} · ${k('ULT', 'when the SUPER bar is full')}<br><small>Duck high shots, jump low ones. Ultimates can't be blocked.</small>`;
   const p2 = mode === '2p' ? `<br><b>P2:</b> arrows move · U/I punch · J/K kick · L block · O run · <b>P</b> special · <b>;</b> ultimate · <b>/</b> grab/throw` : '';
-  return `<h4>CONTROLS</h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('Q', 'grab / throw items')} <small>(smash crates + barrels: barrels explode!)</small><br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = this menu.</small>`;
+  return `<h4>CONTROLS</h4><b>${mode === '2p' ? 'P1: ' : ''}</b>A/D walk · W jump (<b>W again = double jump</b>) · S crouch<br>${k('F/G', 'low/high punch')} · ${k('C/V', 'low/high kick')}<br>${k('Shift', 'block')} · ${k('X', 'run (+ forward)')}<br>${k('S + G', 'uppercut')} · ${k('S + C', 'sweep')}<br>${k('Q', 'grab / throw items')} <small>(smash crates + barrels: barrels explode!)</small><br>${k('E', 'RANGED SPECIAL')} <small>(or down, forward + F/G)</small><br>${k('R', 'ULTIMATE')} <small>(or down, forward + V) when the blue SUPER bar is full</small>${p2}<br><small>Chain light attacks: after one connects, press a different attack to cancel into it. Duck high shots, jump low ones. Ultimates can't be blocked. Esc = this menu.<br>Gamepad: X/Y punch · A/B kick · RB block · LT run · LB grab · RT special · stick click ultimate · Start pause.</small>`;
 }
 
 function newRound() {
@@ -434,6 +454,7 @@ game.throwItem = (f) => {
 };
 game.dropHeld = (f) => { if (f.held) { addItem(f.held, f.x, f.y + 0.8, 0.05); f.held = null; } };
 function updateProps() {
+  fighters.forEach((f) => { f.propAhead = props.some((p) => !p.dead && (p.x - f.x) * f.face > 0 && Math.abs(p.x - f.x) < 1.25); });
   fighters.forEach((f) => { f.nearItem = !f.held && items.some((it) => it.rest && Math.abs(it.x - f.x) < 0.9); }); // used by the CPU
   for (const it of items) if (!it.rest) { it.y += it.vy; it.vy -= 0.01; if (it.y <= 0) { it.y = 0; it.vy = 0; it.rest = true; } }
   for (const t of thrown) {
@@ -509,7 +530,7 @@ function step60() {
     else if (timer <= 0) w = a.hp / a.maxHp === b.hp / b.maxHp ? -2 : a.hp / a.maxHp > b.hp / b.maxHp ? 0 : 1;
     if (w !== -1) endRound(w, timer <= 0 && a.hp > 0 && b.hp > 0);
   } else if (phase === 'end' && ++pt > 150) {
-    if (matchWinner >= 0) { phase = 'over'; show('endbar'); return; }
+    if (matchWinner >= 0) { phase = 'over'; show('endbar'); onMatchOver(); return; }
     round++; newRound();
   }
 }
@@ -556,7 +577,7 @@ function loop(now) {
       while (acc >= 1 / 60 && fighters.length) {
         if (mode === 'online') {
           if (!remoteBuf[simTick]) break; // stall until the opponent's input for this tick arrives
-          const inp = sampleLocal(); localBuf[simTick + DELAY] = inp; net.send({ t: 'in', k: simTick + DELAY, v: packInput(inp) });
+          const inp = sampleLocal(); localBuf[simTick + DELAY] = inp; net.send({ t: 'in', e: epoch, k: simTick + DELAY, v: packInput(inp) });
         }
         acc -= 1 / 60; step60();
         if (mode === 'online') { delete localBuf[simTick]; delete remoteBuf[simTick]; simTick++; }
@@ -592,9 +613,14 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Escape') { if (!$('pause').classList.contains('hidden')) closePause(); else openPause(); }
 });
 $('resume').onclick = closePause;
+const paintMute = () => ['btnMute', 'pMute'].forEach((id) => ($(id).textContent = muted ? '🔇 SOUND: OFF' : '🔊 SOUND: ON'));
+['btnMute', 'pMute'].forEach((id) => ($(id).onclick = () => { muted = !muted; try { localStorage.setItem('brawl-mute', muted ? '1' : '0'); } catch (e) {} paintMute(); }));
+paintMute();
+let padWas = false;
+setInterval(() => { const s = padStart(); if (s && !padWas) { if (!$('pause').classList.contains('hidden')) closePause(); else openPause(); } padWas = s; }, 100);
 $('pauseBtn').onclick = openPause;
 
-const V = 22;
+const V = 24;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [

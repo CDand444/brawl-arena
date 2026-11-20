@@ -8,6 +8,7 @@ export function makeAI(self, opp, level = 1) {
 
   const think = () => {
     const dx = Math.abs(opp.x - self.x), r = Math.random();
+    if (self.propAhead && dx > 1.4) return Math.random() < 0.6 ? { n: 22, press: { hp: 1 } } : { n: 40, press: { u: 1 }, f: 1 }; // crate in the way: smash it or hop over
     if (self.held && dx > 1.6 && Math.random() < 0.7) return { n: 24, press: { th: 1 } };            // throw what it's holding
     if (!self.held && self.nearItem && dx > 1.8 && Math.random() < 0.5) return { n: 24, press: { th: 1 } }; // grab an item at its feet
     if (self.meter >= 100 && dx > 1.2 && Math.random() < 0.4) return { n: 50, press: { ult: 1 } };

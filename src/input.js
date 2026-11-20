@@ -46,3 +46,13 @@ export function setupTouch() {
   pad.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') set(e); });
   ['pointerup', 'pointercancel'].forEach((ev) => pad.addEventListener(ev, clear));
 }
+
+/** Standard-layout gamepad. X/Y = punches, A/B = kicks, RB = block, LT = run, LB = grab/throw, RT = special, stick click = ultimate. */
+export const gamepadInput = (idx) => () => {
+  const o = EMPTY(), p = navigator.getGamepads ? navigator.getGamepads()[idx] : null; if (!p) return o;
+  const b = (i) => (p.buttons[i] && p.buttons[i].pressed ? 1 : 0), ax = p.axes || [];
+  o.l = b(14) || ax[0] < -0.4 ? 1 : 0; o.r = b(15) || ax[0] > 0.4 ? 1 : 0; o.u = b(12) || ax[1] < -0.6 ? 1 : 0; o.d = b(13) || ax[1] > 0.5 ? 1 : 0;
+  o.lp = b(2); o.hp = b(3); o.lk = b(0); o.hk = b(1); o.bl = b(5); o.run = b(6); o.th = b(4); o.sp = b(7); o.ult = b(10) || b(11);
+  return o;
+};
+export const padStart = () => { const ps = navigator.getGamepads ? navigator.getGamepads() : []; for (const p of ps) if (p && p.buttons[9] && p.buttons[9].pressed) return true; return false; };

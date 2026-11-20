@@ -1,7 +1,12 @@
 # Brawl Arena
 
-Browser fighting game, Mortal Kombat 3 style controls. 2.5D (3D models, side view). Desktop + phone.
-Modes: 1 Player vs CPU (3 difficulties), 2 Players on one keyboard. Best of 3 rounds.
+Browser fighting game for a friend group, Mortal Kombat 3 style controls. 2.5D (3D bodies, real-photo 2D heads, side view). Desktop + phone + gamepad.
+Live: https://cdand444.github.io/brawl-arena/
+
+**Modes:** Arcade (fight all the other characters in a row, difficulty ramps), 1 Player vs CPU (3 difficulties), 2 Players on one keyboard (or two gamepads),
+Online (live lobby list or 5-letter code). Best of 3 rounds, 120 s each.
+
+**Gamepad:** X/Y punches, A/B kicks, RB block, LT run, LB grab/throw, RT special, stick click ultimate, Start pause. Pad 1 = P1, pad 2 = P2.
 
 ## Run it
 It must be served over http (modules + fetch don't work from `file://`). Double-click `serve.bat`, then open http://localhost:8000.
@@ -84,19 +89,20 @@ After a match: REMATCH, CHANGE FIGHTER (both players go back to character select
 Menu → ONLINE. One player picks HOST and sends the 5-letter code; the other enters it and presses JOIN. Host is Player 1 (left).
 Both pick a fighter, the match starts, REMATCH needs both players to press it. Works between phone and desktop.
 - Peer-to-peer (WebRTC via PeerJS). The free public PeerJS broker only introduces the two browsers; no game server to run.
+- Inputs carry a match number (`epoch`) so leftovers from a previous match can never be applied after a rematch.
 - Deterministic lockstep: both browsers run the identical simulation and exchange only button presses (4-tick input delay).
   Any code change to `fighter.js` / the sim in `game.js` must stay deterministic: no `Math.random`, `Date.now` or `Math.pow` in game logic.
 - If the connection is slow the game briefly freezes until the opponent's input arrives. Strict corporate/mobile-carrier NATs can block
   direct connections (would need a TURN server).
 - The page must be reachable by both players: deploy the folder to a static host (GitHub Pages, Netlify, Cloudflare Pages). `localhost` only works on one machine.
 
-## Not done yet
-Rollback netcode (smoother at high ping), real animation/rigged models, throws, run meter, gamepads, 2 players on one phone.
+## Not done (ideas)
+Rollback netcode (smoother at high ping), TURN relay for strict networks, rigged/animated models, grapple throws, music, 2 players on one phone.
 
 ## Performance notes
 Rendering is decoupled from the 60 Hz sim (interpolated, time-based smoothing); sparks are pooled; no lights are added/removed at runtime (that recompiles shaders);
 quality drops automatically on sustained low fps (phones start lower). Press F3 for an fps/quality readout.
 
 ## Balance testing
-`__sim(idA, idB, n, level)` in the browser console plays CPU-vs-CPU matches at full speed and returns win counts (level 0-2). Last round-robin (24 matches per pairing, after doubling health and widening the arena): all 8 fighters between 43% and 57% at Normal.
+`__sim(idA, idB, n, level)` in the browser console plays CPU-vs-CPU matches at full speed and returns win counts (level 0-2). Last round-robin (20 matches per pairing, final build): all 8 fighters between 44% and 56% at Normal.
 Tuning notes: stats kept within about +/-8% (speed/power/health multiply, so small differences matter); a summoned backup is chip-damage only (no stun, cannot KO) at 12% power, because even weak helpers swung win rates by ~17 points.
