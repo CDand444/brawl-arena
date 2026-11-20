@@ -35,6 +35,16 @@ extras[nosering|necklace|choker|glasses|watch], stats{speed,power,health ~0.85-1
 ## Code map
 `src/model.js` builds the 3D model and poses · `src/fighter.js` moves + combat · `src/ai.js` CPU · `src/input.js` keyboard/touch · `src/game.js` stage, UI, rounds.
 
+## Photo faces (private)
+A character can wear a real face: `"face": {"src":"faces/<id>.enc","crop":[x,y,w,h],"bright":1,"match":0}` in its JSON.
+- Photos are stored **AES-256 encrypted** in `faces/` (public repo never holds a readable photo). The game asks for the group password once
+  (remembered in the browser) and decrypts them locally. Without it, everyone still gets the stylized avatar. Needs https or localhost.
+- The password and original photos live in `_private/` (git-ignored, never pushed). Keep `_private/PASSWORD.txt` safe; losing it means re-encrypting.
+- Add a face: put the photo in `_private/photos/`, encrypt with
+  `openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -salt -in photo.jpg -out faces/<id>.enc -pass file:<file containing the normalized password>`,
+  then add the `face` block (crop = pixel rectangle around the face, roughly 0.9 wide:tall). Best photos: front-facing, well lit, 400px+ face.
+- `bright` lightens dark photos; `match` (0..1) pulls a color-cast photo toward the character's skin tone.
+
 ## Online play
 Menu → ONLINE. One player picks HOST and sends the 5-letter code; the other enters it and presses JOIN. Host is Player 1 (left).
 Both pick a fighter, the match starts, REMATCH needs both players to press it. Works between phone and desktop.

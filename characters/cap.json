@@ -1,1 +1,41 @@
-{"name":"Cap","tagline":"Lanky and fast","skin":"#5a3a28","hair":{"style":"short","color":"#120c0c"},"eyes":"#120c0c","top":"#f2f2f2","overshirt":"#7d8a78","bottom":"#3a4a6a","shoes":"#eeeeee","build":0.9,"sleeves":"long","hat":{"type":"cap","color":"#f4f4f4"},"extras":["glasses"],"stats":{"speed":1.2,"power":0.85,"health":0.95},"special":{"name":"Plaid Blast","color":"#7dff9a"}}
+{
+ "name": "Cap",
+ "tagline": "Lanky and fast",
+ "skin": "#5a3a28",
+ "hair": {
+  "style": "short",
+  "color": "#120c0c"
+ },
+ "eyes": "#120c0c",
+ "top": "#f2f2f2",
+ "overshirt": "#7d8a78",
+ "bottom": "#3a4a6a",
+ "shoes": "#eeeeee",
+ "build": 0.9,
+ "sleeves": "long",
+ "hat": {
+  "type": "cap",
+  "color": "#f4f4f4"
+ },
+ "extras": [
+  "glasses"
+ ],
+ "stats": {
+  "speed": 1.2,
+  "power": 0.85,
+  "health": 0.95
+ },
+ "special": {
+  "name": "Plaid Blast",
+  "color": "#7dff9a"
+ },
+ "face": {
+  "src": "faces/cap.enc",
+  "crop": [
+   205,
+   125,
+   115,
+   130
+  ]
+ }
+}

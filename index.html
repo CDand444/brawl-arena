@@ -43,6 +43,14 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
 
 <div id="loading" class="screen">Loading…</div>
 
+<div id="gate" class="screen hidden" style="background:#000d">
+  <h1 style="font-size:clamp(28px,6vw,56px)">FRIENDS ONLY</h1>
+  <div class="help">Enter the group password to show everyone's real faces. Without it you still get the stylized fighters.</div>
+  <input id="pw" placeholder="xxxx-xxxx-xxxx-xxxx" autocomplete="off" autocapitalize="off" style="font:inherit;font-size:22px;width:min(300px,80vw);text-align:center;border-radius:8px;border:2px solid #ffd54a;user-select:text;-webkit-user-select:text">
+  <div id="gateMsg" class="help" style="min-height:1.4em"></div>
+  <div style="display:flex;gap:10px"><button id="pwOk">UNLOCK FACES</button><button id="pwSkip" style="background:#333">SKIP</button></div>
+</div>
+
 <div id="menu" class="screen hidden">
   <h1>BRAWL ARENA</h1>
   <button id="btn1p">1 PLAYER vs CPU</button>

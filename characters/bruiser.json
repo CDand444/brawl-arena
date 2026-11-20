@@ -1,1 +1,42 @@
-{"name":"Bruiser","tagline":"Heavy hitter, short locs","skin":"#4a2e20","hair":{"style":"locs","color":"#120c0c"},"beard":"#120c0c","eyes":"#1a1008","top":"#c9c3e6","bottom":"#15171f","shoes":"#5a3bb0","build":1.35,"sleeves":"short","hat":{"type":"beanie","color":"#6a1a2a"},"extras":["watch"],"stats":{"speed":0.9,"power":1.2,"health":1.15},"special":{"name":"Shadow Fist","color":"#9a6aff"}}
+{
+ "name": "Bruiser",
+ "tagline": "Heavy hitter, short locs",
+ "skin": "#4a2e20",
+ "hair": {
+  "style": "locs",
+  "color": "#120c0c"
+ },
+ "beard": "#120c0c",
+ "eyes": "#1a1008",
+ "top": "#c9c3e6",
+ "bottom": "#15171f",
+ "shoes": "#5a3bb0",
+ "build": 1.35,
+ "sleeves": "short",
+ "hat": {
+  "type": "beanie",
+  "color": "#6a1a2a"
+ },
+ "extras": [
+  "watch"
+ ],
+ "stats": {
+  "speed": 0.9,
+  "power": 1.2,
+  "health": 1.15
+ },
+ "special": {
+  "name": "Shadow Fist",
+  "color": "#9a6aff"
+ },
+ "face": {
+  "src": "faces/bruiser.enc",
+  "crop": [
+   640,
+   385,
+   210,
+   233
+  ],
+  "bright": 1.7
+ }
+}

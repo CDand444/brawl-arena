@@ -1,1 +1,25 @@
-{"name":"Bride","tagline":"Elegant but deadly","skin":"#7a4a32","hair":{"style":"updo","color":"#120c0c"},"eyes":"#2a1a12","top":"#fbfbf8","bottom":"#fbfbf8","shoes":"#ffffff","build":1,"sleeves":"none","gown":true,"stats":{"speed":0.95,"power":1.05,"health":1.05},"special":{"name":"Veil Strike","color":"#ffffff"}}
+{
+ "name": "Bride",
+ "tagline": "Elegant but deadly",
+ "skin": "#7a4a32",
+ "hair": {
+  "style": "updo",
+  "color": "#120c0c"
+ },
+ "eyes": "#2a1a12",
+ "top": "#fbfbf8",
+ "bottom": "#fbfbf8",
+ "shoes": "#ffffff",
+ "build": 1,
+ "sleeves": "none",
+ "gown": true,
+ "stats": {
+  "speed": 0.95,
+  "power": 1.05,
+  "health": 1.05
+ },
+ "special": {
+  "name": "Veil Strike",
+  "color": "#ffffff"
+ }
+}

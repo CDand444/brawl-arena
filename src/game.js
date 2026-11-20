@@ -1,31 +1,20 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose } from './model.js';
+import { buildCharacter, applyPose, applyFace } from './model.js';
+import { loadFaces, canDecrypt } from './faces.js';
 import { Fighter, MOVES } from './fighter.js';
 import { makeAI } from './ai.js';
 import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js';
 import { Net, packInput, unpackInput } from './net.js';
+import { buildStage } from './stage.js';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
 
 /* ---------- three.js stage ---------- */
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true, alpha: true });
-renderer.shadowMap.enabled = true;
 const scene = new THREE.Scene();
-const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-scene.add(new THREE.HemisphereLight(0xffffff, 0x443355, 1.0));
-const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(3, 6, 6); sun.castShadow = true;
-Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 6, bottom: -2 }); sun.shadow.mapSize.set(1024, 1024);
-scene.add(sun);
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 14), new THREE.MeshStandardMaterial({ color: 0x2b2233, roughness: 0.9 }));
-floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
-const grid = new THREE.GridHelper(60, 60, 0x6a4a7a, 0x3a2f48); grid.position.y = 0.01; scene.add(grid);
-const moon = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 16), new THREE.MeshBasicMaterial({ color: 0xffe9c0 })); moon.position.set(0, 6, -16); scene.add(moon);
-for (let i = -6; i <= 6; i++) { // pillars
-  const h = 4 + ((i * 37) % 3 + 3) * 0.7;
-  const p = new THREE.Mesh(new THREE.BoxGeometry(1.2, h, 1.2), new THREE.MeshStandardMaterial({ color: 0x3b2f4a, emissive: 0x1a0f26 }));
-  p.position.set(i * 4, h / 2, -9 - (i % 2) * 2); scene.add(p);
-}
+const cam = new THREE.PerspectiveCamera(35, 1, 0.1, 120);
+const stage = buildStage(scene, renderer);
 function resize() {
   const w = innerWidth, h = innerHeight;
   renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); renderer.setSize(w, h, false);
@@ -33,9 +22,9 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 
-function frameCamera(cx, spread, k = 1) {
-  const halfW = Math.max(3.4, spread / 2 + 2.2), t = Math.tan((cam.fov * Math.PI) / 360);
-  const z = Math.max(halfW / (t * cam.aspect), 1.8 / t);
+function frameCamera(cx, spread, k = 1, minHalf = 3.4) {
+  const halfW = Math.max(minHalf, spread / 2 + 2.2), t = Math.tan((cam.fov * Math.PI) / 360);
+  const z = Math.max(halfW / (t * cam.aspect), (minHalf < 3 ? 1.35 : 1.8) / t);
   cam.position.x += (cx - cam.position.x) * 0.1 * k; cam.position.y = 1.5; cam.position.z += (z - cam.position.z) * 0.1 * k;
   cam.lookAt(cam.position.x, 1.15, 0);
 }
@@ -55,6 +44,8 @@ async function loadCharacters() {
   const ids = await (await fetch('characters/index.json')).json();
   defs = await Promise.all(ids.map(async (id) => ({ id, ...(await (await fetch(`characters/${id}.json`)).json()) })));
 }
+const faceTex = {};
+function makeRig(def) { const rig = buildCharacter(def); if (faceTex[def.id]) applyFace(rig, faceTex[def.id], def.face); return rig; }
 const css = (c) => (typeof c === 'string' ? c : '#' + c.toString(16).padStart(6, '0'));
 
 /* ---------- menu & select ---------- */
@@ -62,7 +53,7 @@ let mode = 'ai', diff = 1, picks = [], step = 0, preview = [null, null];
 const previewRoot = new THREE.Group(); scene.add(previewRoot);
 function setPreview(slot, def) {
   if (preview[slot]) previewRoot.remove(preview[slot].root);
-  preview[slot] = def ? buildCharacter(def) : null;
+  preview[slot] = def ? makeRig(def) : null;
   if (preview[slot]) { preview[slot].root.position.x = slot ? 1.5 : -1.5; previewRoot.add(preview[slot].root); }
 }
 function buildSelect() {
@@ -155,8 +146,8 @@ function startMatch() {
   show('select', false); show('menu', false); show('endbar', false); previewRoot.visible = false; clearFighters();
   const kb1 = mode === 'ai' ? combine(keyboardInput(KEYMAPS.p1, KEYMAPS.p2), touchInput()) : keyboardInput(KEYMAPS.p1);
   fighters = [
-    new Fighter(picks[0], buildCharacter(picks[0]), 0, kb1),
-    new Fighter(picks[1], buildCharacter(picks[1]), 1, mode === 'p2' ? keyboardInput(KEYMAPS.p2) : null),
+    new Fighter(picks[0], makeRig(picks[0]), 0, kb1),
+    new Fighter(picks[1], makeRig(picks[1]), 1, mode === 'p2' ? keyboardInput(KEYMAPS.p2) : null),
   ];
   if (mode === 'ai') fighters[1].getInput = makeAI(fighters[1], fighters[0], diff);
   if (mode === 'online') { // each tick's inputs come from the exchanged buffers
@@ -180,7 +171,7 @@ function banner(t, sub = '') { $('banner').innerHTML = t + (sub ? `<small>${sub}
 
 game.spawnProjectile = (f) => {
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), new THREE.MeshBasicMaterial({ color: css(f.def.special?.color ?? '#ff7a1a') }));
-  mesh.add(new THREE.PointLight(css(f.def.special?.color ?? '#ff7a1a'), 2, 4));
+  mesh.add(new THREE.PointLight(css(f.def.special?.color ?? '#ff7a1a'), 4, 6)); mesh.add(stage.glow(css(f.def.special?.color ?? '#ff7a1a'), 2.2));
   mesh.position.set(f.x + f.face * 0.8, 1.35, 0); scene.add(mesh);
   projectiles.push({ owner: f, mesh, x: f.x + f.face * 0.8, dir: f.face, dmg: MOVES.fb.dmg });
   f.fbCooldown = 50; sfx(300, 0.2, 'sawtooth');
@@ -194,6 +185,9 @@ game.tryHit = (att, def, m) => {
   if (Math.min(a, b) - 0.3 > def.x || Math.max(a, b) + 0.3 < def.x) return false;
   const r = def.receive(att, m, game);
   sfx(r === 'block' ? 120 : 200, 0.09, r === 'block' ? 'triangle' : 'square', r === 'block' ? 0.05 : 0.09);
+  const hx = def.x - att.face * 0.25, hy = Math.max(0.4, def.y + (m.y[0] + m.y[1]) / 2 - att.y);
+  if (r === 'block') stage.spark(hx, hy, 5, 0x9ab8ff, 0.7);
+  else { stage.spark(hx, hy, 8 + Math.round(m.dmg), m.launch || m.knock ? 0xff8a3a : 0xffd070, 0.8 + m.dmg / 14); stage.shake = Math.min(0.9, stage.shake + m.dmg / 14); }
   return true;
 };
 
@@ -214,10 +208,10 @@ function step60() {
   }
   // projectiles
   for (const p of projectiles) {
-    p.x += p.dir * 0.12; p.mesh.position.x = p.x;
+    p.x += p.dir * 0.12; p.mesh.position.x = p.x; if (Math.random() < 0.6) stage.spark(p.x - p.dir * 0.3, 1.35, 1, 0xffb060, 0.5);
     const t = p.owner === a ? b : a;
     if (phase === 'fight' && Math.abs(p.x - t.x) < 0.45 && t.y < 1.9 && t.inv === 0 && t.state !== 'down' && t.state !== 'getup') {
-      p.dead = true; t.receive(p.owner, { dmg: p.dmg, kb: 0.1, hs: 22, bs: 14, knock: true }, game); sfx(160, 0.15, 'sawtooth', 0.09);
+      p.dead = true; stage.spark(p.x, 1.4, 22, 0xff9a3a, 1.4); stage.shake += 0.5; t.receive(p.owner, { dmg: p.dmg, kb: 0.1, hs: 22, bs: 14, knock: true }, game); sfx(160, 0.15, 'sawtooth', 0.09);
     }
     if (Math.abs(p.x) > 12) p.dead = true;
   }
@@ -253,9 +247,9 @@ function endRound(w, timeUp) {
 }
 function poseUpdate(f) {
   const st = f.state;
-  applyPose(f.rig, st === 'win' ? 'win' : f.poseName(), f.u, st === 'attack' ? 0.5 : 0.35);
+  applyPose(f.rig, st === 'win' ? 'win' : f.poseName(), f.u, st === 'attack' ? 0.5 : 0.35, -f.face * 0.4);
   f.rig.root.position.set(f.x, f.y, 0);
-  f.rig.root.rotation.y = f.face * Math.PI / 2;
+  f.rig.root.rotation.y = f.face * (Math.PI / 2 - 0.45); // 3/4 view so faces show to the camera
 }
 
 /* ---------- main loop ---------- */
@@ -264,8 +258,8 @@ function loop(now) {
   requestAnimationFrame(loop);
   const dt = Math.min(0.1, (now - last) / 1000); last = now;
   if (phase === 'menu') {
-    previewRoot.children.forEach((g, i) => { g.rotation.y = now / 1000; });
-    frameCamera(0, 3, 3);
+    previewRoot.children.forEach((g, i) => { g.rotation.y = Math.sin(now / 900 + i) * 0.8; });
+    frameCamera(0, 0, 3, 2.3);
   } else {
     if (!paused) {
       acc = Math.min(acc + dt, 0.25);
@@ -286,12 +280,29 @@ function loop(now) {
       $('timer').textContent = Math.max(0, Math.ceil(timer / 60));
     }
   }
-  renderer.render(scene, cam);
+  stage.update(now, dt);
+  const sh = stage.shake * 0.14, ox = (Math.random() - 0.5) * sh, oy = (Math.random() - 0.5) * sh;
+  cam.position.x += ox; cam.position.y += oy; renderer.render(scene, cam); cam.position.x -= ox; cam.position.y -= oy;
 }
 addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online' && ['fight', 'intro', 'end'].includes(phase)) { paused = !paused; show('pause', paused); } });
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-loadCharacters().then(() => { buildSelect(); show('loading', false); show('menu'); requestAnimationFrame(loop); })
-  .catch((e) => { $('loading').textContent = 'Failed to load characters. Run the game through a web server (see README). ' + e; });
+async function boot() {
+  await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
+  const anyFace = defs.some((d) => d.face);
+  if (!anyFace || !canDecrypt()) return show('menu');
+  const tryPw = async (pw) => { Object.assign(faceTex, await loadFaces(defs, pw)); try { localStorage.setItem('brawl-pw', pw); } catch (e) {} };
+  let saved = null; try { saved = localStorage.getItem('brawl-pw'); } catch (e) {}
+  if (saved) { try { await tryPw(saved); return show('menu'); } catch (e) { /* ask again */ } }
+  show('gate');
+  const unlock = async () => {
+    $('gateMsg').textContent = 'Checking…';
+    try { await tryPw($('pw').value); show('gate', false); show('menu'); }
+    catch (e) { $('gateMsg').textContent = 'Wrong password.'; }
+  };
+  $('pwOk').onclick = unlock; $('pw').onkeydown = (e) => { if (e.key === 'Enter') unlock(); };
+  $('pwSkip').onclick = () => { show('gate', false); show('menu'); };
+}
+boot().catch((e) => { $('loading').classList.remove('hidden'); $('loading').textContent = 'Failed to load. Run the game through a web server (see README). ' + e; });
 window.__game = { get fighters() { return fighters; }, get phase() { return phase; }, get tick() { return simTick; } };

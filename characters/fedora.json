@@ -1,1 +1,35 @@
-{"name":"Fedora","tagline":"Smooth and stylish","skin":"#8a5a3c","hair":{"style":"short","color":"#1a1210"},"beard":"#1a1210","eyes":"#1a1008","top":"#15151c","pattern":["#e8c030","#e04a4a","#4aa0e8","#e87ac0"],"bottom":"#2a2a36","shoes":"#222222","build":1.1,"sleeves":"short","hat":{"type":"fedora","color":"#e6b8b0"},"stats":{"speed":1,"power":1,"health":1},"special":{"name":"Power Pellet","color":"#ffe030"}}
+{
+ "name": "Fedora",
+ "tagline": "Smooth and stylish",
+ "skin": "#8a5a3c",
+ "hair": {
+  "style": "short",
+  "color": "#1a1210"
+ },
+ "beard": "#1a1210",
+ "eyes": "#1a1008",
+ "top": "#15151c",
+ "pattern": [
+  "#e8c030",
+  "#e04a4a",
+  "#4aa0e8",
+  "#e87ac0"
+ ],
+ "bottom": "#2a2a36",
+ "shoes": "#222222",
+ "build": 1.1,
+ "sleeves": "short",
+ "hat": {
+  "type": "fedora",
+  "color": "#e6b8b0"
+ },
+ "stats": {
+  "speed": 1,
+  "power": 1,
+  "health": 1
+ },
+ "special": {
+  "name": "Power Pellet",
+  "color": "#ffe030"
+ }
+}
