@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><title>Brawl Arena</title>
-<link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon.svg"><meta name="theme-color" content="#2a0f2e">
+<script>if(!(/iPad|iPhone|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))){var l=document.createElement('link');l.rel='manifest';l.href='manifest.webmanifest';document.head.appendChild(l);}</script><link rel="icon" href="icon.svg"><meta name="theme-color" content="#2a0f2e">
 <meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Brawl Arena">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <style>
@@ -131,7 +131,7 @@ select{font:inherit;font-size:18px;padding:8px;border-radius:8px}
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
-<script type="module" src="src/game.js?v=12"></script>
+<script type="module" src="src/game.js?v=13"></script>
 <script>
 // pause button visible only while fighting
 new MutationObserver(()=>{document.getElementById('pauseBtn').classList.toggle('hidden',document.getElementById('hud').classList.contains('hidden'))}).observe(document.getElementById('hud'),{attributes:true});

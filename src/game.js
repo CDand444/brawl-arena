@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=12';
-import { loadFaces, canDecrypt } from './faces.js?v=12';
-import { Fighter, MOVES } from './fighter.js?v=12';
-import { makeAI } from './ai.js?v=12';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=12';
-import { Net, packInput, unpackInput } from './net.js?v=12';
-import { buildStage, MAPS } from './stage.js?v=12';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=13';
+import { loadFaces, canDecrypt } from './faces.js?v=13';
+import { Fighter, MOVES } from './fighter.js?v=13';
+import { makeAI } from './ai.js?v=13';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=13';
+import { Net, packInput, unpackInput } from './net.js?v=13';
+import { buildStage, MAPS } from './stage.js?v=13';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -378,7 +378,8 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-const V = 12;
+const V = 13;
+const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [
   `<div class="adh">GAMER ALERT!!</div><div class="ps3"><div class="slab"><i></i>PS3</div></div><div class="adt">PS3: "barely used, only played on weekends"</div><div class="adp">$49 OBO · controller sold separately · yes, it still plays Blu-ray</div><button>BUY NOW (not real)</button>`,
@@ -432,7 +433,7 @@ async function boot() {
   };
   $('pwOk').onclick = unlock; $('pw').onkeydown = (e) => { if (e.key === 'Enter') unlock(); };
   const fromLink = new URLSearchParams(location.hash.slice(1)).get('k'); // share link: .../#k=<password> (the # part never reaches a server)
-  if (fromLink) { try { await tryPw(fromLink); history.replaceState(null, '', location.pathname + location.search); return show('menu'); } catch (e) { console.warn('link password failed', e); } }
+  if (fromLink) { try { await tryPw(fromLink); if (!IOS) history.replaceState(null, '', location.pathname + location.search); /* iOS keeps #k so Add to Home Screen saves it */ return show('menu'); } catch (e) { console.warn('link password failed', e); } }
   if (saved) { try { await tryPw(saved); return show('menu'); } catch (e) { console.warn('saved password failed', e); } }
   openGate();
 }

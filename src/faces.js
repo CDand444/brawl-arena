@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 // Photos are stored AES-256 encrypted (openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -md sha256) so the public repo
 // never contains readable photos. They are decrypted in the browser with the group password.
-export const normalize = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+export const normalize = (s) => { const m = /[#?&]k=([^&\s]+)/i.exec(s); return (m ? m[1] : s).toLowerCase().replace(/[^a-z0-9]/g, ''); }; // accepts the password or a pasted share link
 export const canDecrypt = () => !!(globalThis.crypto && crypto.subtle); // needs https or localhost
 
 async function decrypt(buf, pw) {

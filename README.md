@@ -61,6 +61,11 @@ A character can wear a real face: `"face": {"src":"faces/<id>.enc","crop":[x,y,w
 - Photo faces render as a flat 2D head cutout (billboard) with an outline; it always faces the camera and flips (coin-style) when the fighter turns.
 - `bright` lightens dark photos; `match` (0..1) pulls a color-cast photo toward the character's skin tone.
 
+### Home-screen app and the password
+Android (Chrome) shares saved data with the browser, so the password carries over. iPhone home-screen apps have their own storage and the shortcut is created from the exact
+page address: open the **share link with `#k=...`** in Safari first, then Share → Add to Home Screen (the page is served without a manifest on iOS so the address, including `#k=`, is kept).
+If the app still asks for the password, paste the password or the whole share link into the box once; it is remembered after that.
+
 ## Online play
 Menu → ONLINE. One player picks HOST and sends the 5-letter code; the other enters it and presses JOIN. Host is Player 1 (left).
 Both pick a fighter, the match starts, REMATCH needs both players to press it. Works between phone and desktop.
