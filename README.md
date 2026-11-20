@@ -47,6 +47,7 @@ smooth walk acceleration, air steering + fast-fall (hold down), impact freeze-fr
 ## Smash mode (up to 4 players)
 Free-for-all on a floating stage with 3 platforms (`src/smash.js`). No health bars: **damage %** climbs with each hit and the higher it is the farther you fly;
 get knocked past the edge of the screen (blast zone) and you lose a **life**. Last one with lives wins. Lives 1-9, stage picker.
+- Ultimates have no cutscene in Smash (a quick banner + flash instead) so 4-player matches keep moving.
 - Jump up through floating platforms, **tap down** to drop through. **Up + SPECIAL in the air** = one recovery boost per airtime (plus your double jump).
 - Slots: Keyboard 1 (WASD keys), Keyboard 2 (arrow keys), Gamepads 1-4, Touch, CPU (Easy/Normal/Hard) or Off. Each fighter gets a P1-P4 tag over their head.
 - **Online:** Online -> HOST SMASH ROOM. Friends tap it in the live list (or type the 6-letter code). Each player picks a fighter; the host fills empty slots with CPUs, picks lives and stage, and starts.

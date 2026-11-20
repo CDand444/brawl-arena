@@ -90,7 +90,12 @@ export function createSmash(ctx) {
       if (!ult) f.fbCooldown = 50;
       sfx(ult ? 150 : 300, ult ? 0.5 : 0.2, 'sawtooth', ult ? 0.12 : 0.05);
     },
-    onUlt(f) { ctx.cut.start(f, trySummon(f)); },
+    onUlt(f) { // no cutscene in Smash: just a quick banner + flash, the match keeps moving
+      const label = trySummon(f), u = f.def.ultimate || {};
+      banner(`P${f.slot + 1} ${(u.name || 'ULTIMATE').toUpperCase()}!`, label ? label + ' SHOWS UP TO HELP!' : ''); sUlt = 90;
+      stage.shake += 0.6; sfx(80, 0.6, 'sawtooth', 0.12);
+      const el = $('flash'); el.style.transition = 'none'; el.style.opacity = 0.6; requestAnimationFrame(() => { el.style.transition = 'opacity .5s'; el.style.opacity = 0; });
+    },
     onDJ(f) { stage.spark(f.x, f.y + 0.15, 8, 0xffffff, 0.6); sfx(520, 0.08, 'triangle', 0.04); },
     onRecover(f) { stage.spark(f.x, f.y + 0.4, 16, 0x9ad8ff, 0.9); sfx(660, 0.12, 'triangle', 0.05); },
   };

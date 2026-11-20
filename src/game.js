@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=27';
-import { loadFaces, canDecrypt, normalize } from './faces.js?v=27';
-import { Fighter, MOVES } from './fighter.js?v=27';
-import { makeAI } from './ai.js?v=27';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=27';
-import { Net, Lobby, Room, packInput, unpackInput } from './net.js?v=27';
-import { createSmash } from './smash.js?v=27';
-import { buildStage, MAPS } from './stage.js?v=27';
+import { buildCharacter, applyPose, applyFace, updateFace, toonMat, OUTLINE } from './model.js?v=28';
+import { loadFaces, canDecrypt, normalize } from './faces.js?v=28';
+import { Fighter, MOVES } from './fighter.js?v=28';
+import { makeAI } from './ai.js?v=28';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch, gamepadInput, padStart } from './input.js?v=28';
+import { Net, Lobby, Room, packInput, unpackInput } from './net.js?v=28';
+import { createSmash } from './smash.js?v=28';
+import { buildStage, MAPS } from './stage.js?v=28';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -635,7 +635,7 @@ let padWas = false;
 setInterval(() => { const s = padStart(); if (s && !padWas) { if (!$('pause').classList.contains('hidden')) closePause(); else openPause(); } padWas = s; }, 100);
 $('pauseBtn').onclick = openPause;
 
-const V = 27;
+const V = 28;
 const IOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 /* ---------- joke pop-up ads (fake, cosmetic only; one tap anywhere closes) ---------- */
 const ADS = [
