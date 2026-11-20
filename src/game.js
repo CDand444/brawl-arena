@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=7';
-import { loadFaces, canDecrypt } from './faces.js?v=7';
-import { Fighter, MOVES } from './fighter.js?v=7';
-import { makeAI } from './ai.js?v=7';
-import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=7';
-import { Net, packInput, unpackInput } from './net.js?v=7';
-import { buildStage } from './stage.js?v=7';
+import { buildCharacter, applyPose, applyFace, updateFace } from './model.js?v=8';
+import { loadFaces, canDecrypt } from './faces.js?v=8';
+import { Fighter, MOVES } from './fighter.js?v=8';
+import { makeAI } from './ai.js?v=8';
+import { EMPTY, KEYMAPS, keyboardInput, touchInput, combine, setupTouch } from './input.js?v=8';
+import { Net, packInput, unpackInput } from './net.js?v=8';
+import { buildStage } from './stage.js?v=8';
 
 const $ = (id) => document.getElementById(id);
 const show = (id, on = true) => $(id).classList.toggle('hidden', !on);
@@ -314,7 +314,7 @@ addEventListener('keydown', (e) => { if (e.code === 'Escape' && mode !== 'online
 $('resume').onclick = () => { paused = false; show('pause', false); };
 $('pauseBtn').onclick = () => { if (mode === 'online') return goMenu(); paused = true; show('pause', true); }; // online: no pause, button quits
 
-const V = 7; // bump to bust browser caches after updates
+const V = 8; // bump to bust browser caches after updates
 async function boot() {
   await loadCharacters(); buildSelect(); show('loading', false); requestAnimationFrame(loop);
   const withFace = defs.filter((d) => d.face).length;
@@ -337,6 +337,8 @@ async function boot() {
     catch (e) { console.warn('face unlock failed', e); $('gateMsg').textContent = /password/i.test(String(e.message)) || e.name === 'OperationError' ? 'Wrong password.' : 'Could not load photos: ' + (e.message || e); }
   };
   $('pwOk').onclick = unlock; $('pw').onkeydown = (e) => { if (e.key === 'Enter') unlock(); };
+  const fromLink = new URLSearchParams(location.hash.slice(1)).get('k'); // share link: .../#k=<password> (the # part never reaches a server)
+  if (fromLink) { try { await tryPw(fromLink); history.replaceState(null, '', location.pathname + location.search); return show('menu'); } catch (e) { console.warn('link password failed', e); } }
   if (saved) { try { await tryPw(saved); return show('menu'); } catch (e) { console.warn('saved password failed', e); } }
   openGate();
 }

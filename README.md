@@ -45,6 +45,7 @@ extras[nosering|necklace|choker|glasses|watch], stats{speed,power,health ~0.85-1
 A character can wear a real face: `"face": {"src":"faces/<id>.enc","crop":[x,y,w,h],"bright":1,"match":0}` in its JSON.
 - Photos are stored **AES-256 encrypted** in `faces/` (public repo never holds a readable photo). The game asks for the group password once
   (remembered in the browser) and decrypts them locally. Without it, everyone still gets the stylized avatar. Needs https or localhost.
+- Share link with the password built in: `https://cdand444.github.io/brawl-arena/#k=<password>`. Anything after `#` is never sent to a server, and the game removes it from the address bar after unlocking. Anyone with the link can see the faces, so only send it to friends.
 - The password and original photos live in `_private/` (git-ignored, never pushed). Keep `_private/PASSWORD.txt` safe; losing it means re-encrypting.
 - Add a face: put the photo in `_private/photos/`, encrypt with
   `openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -md sha256 -salt -in photo.jpg -out faces/<id>.enc -pass file:<file containing the normalized password>`,
